@@ -1,0 +1,20 @@
+# Model weights and HuggingFace cache
+models/
+*.gguf
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.sup
+*.swp
+*~

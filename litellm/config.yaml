@@ -1,0 +1,16 @@
+model_list:
+
+  - model_name: tinyllama
+    litellm_params:
+      model: openai/tinyllama
+      api_base: http://tinyllama:8080/v1
+      api_key: dummy
+
+  - model_name: qwen-small
+    litellm_params:
+      model: openai/qwen-small
+      api_base: http://qwen-small:8080/v1
+      api_key: dummy
+
+general_settings:
+  master_key: sk-super-secret-key
