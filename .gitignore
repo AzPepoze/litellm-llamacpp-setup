@@ -1,5 +1,7 @@
-# Model weights and HuggingFace cache
+# Model weights and HuggingFace cache (entire directory recursively)
+/models/
 models/
+models/**/*
 *.gguf
 
 # Environment variables and secrets
