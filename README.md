@@ -1,44 +1,46 @@
-# LiteLLM LLM Server & Gateway
+# LiteLLM LLM Server & Gateway with Admin Dashboard
 
-A production-ready, highly-configurable LLM proxy and gateway system. This setup uses [LiteLLM](https://github.com/BerriAI/litellm) to provide a single, unified, OpenAI-compatible API interface that routes requests to various LLM backends (such as local self-hosted models or external commercial APIs like OpenAI, Anthropic, and Gemini).
+A secure, production-ready, multi-container LLM gateway. This setup isolates the internal LLM routers (LiteLLM), inference backends (llama.cpp/vLLM), key database (PostgreSQL), and admin APIs behind a single **Nginx Secure Gateway** that acts as the only entry point exposed to the host machine.
+
+Access is routed using virtual hosting ports:
+*   **`http://localhost` (Port 80)** -> For the secure admin key-management dashboard.
+*   **`http://localhost:8080` (Port 8080)** -> For client LLM API requests (`/v1/*`).
 
 ---
 
 ## Table of Contents
-1. [Overview & Architecture](#overview--architecture)
+1. [Architecture & Flow](#architecture--flow)
 2. [Project Structure](#project-structure)
 3. [Prerequisites](#prerequisites)
 4. [Deployment Guide](#deployment-guide)
-5. [Adding and Customizing Models](#adding-and-customizing-models)
-    - [Self-Hosted (vLLM, Ollama, llama.cpp)](#1-self-hosted-engines-via-docker)
-    - [Commercial APIs (OpenAI, Anthropic, Gemini)](#2-commercial-api-providers)
-6. [Securing the Gateway (Nginx Integration)](#securing-the-gateway-nginx-integration)
-7. [API Verification Examples](#api-verification-examples)
+5. [Admin Dashboard Guide](#admin-dashboard-guide)
+6. [Adding new models (vLLM, Ollama, APIs)](#adding-new-models)
+7. [Verifying API Requests](#verifying-api-requests)
 
 ---
 
-## Overview & Architecture
+## Architecture & Flow
 
 ```mermaid
 graph TD
-    Client[Client App / API Request] -->|Port 4000 / Auth Header| LiteLLM[LiteLLM Gateway]
+    Client[Client App / Admin Browser] -->|Port 80 / 8080| Nginx[Nginx Gateway<br/>Only Exposed Container]
     
-    subgraph Local LLM Backends
-        LiteLLM -->|Proxy request| TinyLlama[TinyLlama Container<br/>llama.cpp]
-        LiteLLM -->|Proxy request| Qwen[Qwen Container<br/>llama.cpp]
-        LiteLLM -->|Proxy request| vLLM[vLLM / Ollama Container<br/>Optional]
-    end
-
-    subgraph External Provider APIs
-        LiteLLM -->|Route with API Key| OpenAI[OpenAI API]
-        LiteLLM -->|Route with API Key| Anthropic[Anthropic API]
+    Nginx -->|Port 8080| LiteLLM[LiteLLM Proxy<br/>Port 4000 Internal]
+    Nginx -->|Port 80| Frontend[Admin Frontend<br/>Port 80 Internal]
+    Nginx -->|Port 80 /api/*| Backend[Admin Backend<br/>Port 5000 Internal]
+    
+    Backend -->|Calls API with Master Key| LiteLLM
+    LiteLLM -->|Saves Keys & Spend| Postgres[(PostgreSQL DB<br/>Port 5432 Internal)]
+    
+    subgraph Model Runtimes
+        LiteLLM -->|GGUF Queries| TinyLlama[TinyLlama Container]
+        LiteLLM -->|GGUF Queries| Qwen[Qwen Container]
     end
 ```
 
-### Key Benefits
-* **OpenAI-Compatible Interface:** Speak to any local or remote model using the standard OpenAI client libraries (`openai` package in Python, Node, etc.).
-* **Load Balancing & Failover:** Automatically retry and route requests across multiple redundant model endpoints.
-* **Unified Key Management:** Define a `master_key` or individual user keys at the LiteLLM gateway layer to manage access easily.
+### Key Security Benefits
+*   **Decoupled Frontend:** The static HTML frontend communicates only with the Admin Backend. LiteLLM master tokens are never sent to or stored in the client web browser.
+*   **Stateful Key Persistence:** Virtual API keys, model rate limits (TPM/RPM), and team budgets are stored persistently in PostgreSQL.
 
 ---
 
@@ -46,23 +48,29 @@ graph TD
 
 ```bash
 .
-├── docker-compose.yaml     # Service orchestrator (llama.cpp, LiteLLM, etc.)
+├── docker-compose.yaml     # Service orchestrator (Database, LiteLLM, Front, Back, Nginx)
 ├── litellm/
-│   └── config.yaml         # LiteLLM routing rules and model list
-├── nginx/                  # Optional frontend proxy files for rate-limiting & auth
-│   ├── nginx.conf
-│   └── api_keys.map
-└── models/                 # Shared volume folder storing downloaded GGUF weights
+│   └── config.yaml         # LiteLLM routing rules and model definitions
+├── nginx/
+│   └── nginx.conf          # Nginx routing config (Port 80 & Port 8080 servers)
+├── backend/
+│   ├── server.js           # Admin Dashboard Express API Backend
+│   ├── package.json
+│   └── Dockerfile
+└── frontend/
+    ├── index.html          # Admin Dashboard HTML5 Layout
+    ├── style.css           # Premium Dark Slate Theme
+    └── app.js              # State management & fetch logic
 ```
 
 ---
 
 ## Prerequisites
 
-Before deploying, ensure you have the following installed on your system:
-* [Docker](https://docs.docker.com/get-docker/)
-* [Docker Compose V2](https://docs.docker.com/compose/)
-* [Git](https://git-scm.com/)
+Ensure you have the following installed on your system:
+*   [Docker](https://docs.docker.com/get-docker/)
+*   [Docker Compose V2](https://docs.docker.com/compose/)
+*   [Git](https://git-scm.com/)
 
 ---
 
@@ -74,68 +82,53 @@ git clone <your-repo-url>
 cd LLM
 ```
 
-### Step 2: Configure Models in LiteLLM
-Open [litellm/config.yaml](file:///home/bwrpsp/proj/LLM/litellm/config.yaml) to inspect the model endpoints. By default, it is configured with:
-* `tinyllama` (forwarded to the `tinyllama` container)
-* `qwen-small` (forwarded to the `qwen-small` container)
-* Master API Key: `sk-super-secret-key` (You should change this in production!)
+### Step 2: Configure Environment Secrets
+Ensure the same `LITELLM_MASTER_KEY` is defined in [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml) under the `litellm` and `backend` services.
 
-### Step 3: Run the Stack
-Start the containers in detached mode:
+### Step 3: Start the Containers
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
-
-Docker will automatically pull the LiteLLM and `llama.cpp` server images, download the required model weights (TinyLlama and Qwen) into the `./models` directory, and start the services.
-
-### Step 4: Verify the Services
-Check the container logs to ensure everything is initialized:
-```bash
-docker compose logs -f
-```
+This builds the admin backend image, pulls Nginx, Postgres, and llama.cpp images, configures database tables, and mounts static folders automatically.
 
 ---
 
-## Adding and Customizing Models
+## Admin Dashboard Guide
 
-LiteLLM makes it incredibly easy to switch, add, or customize models. You are **not** locked into `llama.cpp`. You can add alternative inference engines or third-party APIs.
+Open your web browser and navigate to:
+👉 **[http://localhost](http://localhost)**
 
-### 1. Self-Hosted Engines via Docker
+### Features:
+1.  **Overview Telemetry:** Displays total active virtual keys, total gateway spend in USD, and total allocated budget across all generated keys.
+2.  **Generate Keys:** 
+    *   Enter an alias description (e.g. `Marketing Devs`).
+    *   Select which models this key has access to (e.g., `tinyllama`, `qwen-small`).
+    *   Set maximum USD budgets and request rate limits (RPM / TPM).
+3.  **Secure Modal Display:** When a key is created, the raw token is displayed in a warning popup. **Copy it immediately**, as it will not be displayed again.
+4.  **Revocation:** Click **Revoke** on any key to delete it from the Postgres database. The key will immediately stop working.
 
-If you want to use **vLLM**, **Ollama**, or another backend:
+---
 
-#### Step A: Add the Service to `docker-compose.yaml`
-Add a new service block in [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml) matching the runtime of your choice.
+## Adding New Models
 
-**Example: Adding a vLLM container**
+You can customize or add models by mapping them inside `docker-compose.yaml` and registering them in `litellm/config.yaml`.
+
+### 1. Adding a vLLM Container
+In [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml), add:
 ```yaml
   vllm-server:
     image: vllm/vllm-openai:latest
     container_name: vllm-server
     restart: unless-stopped
-    environment:
-      - HUGGING_FACE_HUB_TOKEN=your_token_here
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
-    ports:
-      - "8000:8000"
     ipc: host
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     command: --model facebook/opt-125m
 ```
 
-#### Step B: Map the Model in LiteLLM
-Add the corresponding mapping inside [litellm/config.yaml](file:///home/bwrpsp/proj/LLM/litellm/config.yaml):
+In [litellm/config.yaml](file:///home/bwrpsp/proj/LLM/litellm/config.yaml), add:
 ```yaml
 model_list:
-  # ... existing models ...
-
   - model_name: my-vllm-model
     litellm_params:
       model: openai/facebook/opt-125m
@@ -143,93 +136,41 @@ model_list:
       api_key: dummy
 ```
 
----
-
-### 2. Commercial API Providers
-
-You can also use external models (OpenAI, Anthropic, Gemini, etc.) directly. You only need to configure them in LiteLLM without spinning up any local containers.
-
-Add the following to [litellm/config.yaml](file:///home/bwrpsp/proj/LLM/litellm/config.yaml):
+### 2. Adding Commercial APIs (OpenAI, Anthropic, Gemini)
+Pass your provider API key in the environment block of the `litellm` service inside [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml), then add them to your model list:
 ```yaml
 model_list:
   - model_name: gpt-4o
     litellm_params:
       model: gpt-4o
       api_key: "os.environ/OPENAI_API_KEY"
-
-  - model_name: claude-3-5-sonnet
-    litellm_params:
-      model: anthropic/claude-3-5-sonnet-20240620
-      api_key: "os.environ/ANTHROPIC_API_KEY"
-```
-
-Pass the required environment keys to the `litellm` service in your [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml):
-```yaml
-  litellm:
-    ...
-    environment:
-      - OPENAI_API_KEY=your-openai-api-key
-      - ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 
 ---
 
-## Securing the Gateway (Nginx Integration)
+## Verifying API Requests
 
-The repository includes a template for Nginx reverse-proxy setup under [nginx/nginx.conf](file:///home/bwrpsp/proj/LLM/nginx/nginx.conf) and [nginx/api_keys.map](file:///home/bwrpsp/proj/LLM/nginx/api_keys.map). 
-
-To leverage this for rate-limiting and authenticating clients:
-1. Update `upstream llm_backend` in [nginx.conf](file:///home/bwrpsp/proj/LLM/nginx/nginx.conf) to point to the LiteLLM container instead of llama-cpp:
-   ```nginx
-   upstream llm_backend {
-       server litellm:4000;
-   }
-   ```
-2. Define accepted client tokens in [api_keys.map](file:///home/bwrpsp/proj/LLM/nginx/api_keys.map).
-3. Mount/run Nginx container in [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml) listening on port 80/443.
-
----
-
-## API Verification Examples
-
-Once the stack is up, you can test LiteLLM using standard HTTP/curl requests.
+Once you generate a virtual key (e.g., `sk-12345...`) from the Admin Dashboard, use it to query models through the gateway.
 
 ### 1. List Available Models
 ```bash
-curl --location 'http://localhost:4000/v1/models' \
---header 'Authorization: Bearer sk-super-secret-key'
+curl --location 'http://localhost:8080/v1/models' \
+--header 'Authorization: Bearer sk-your-generated-key'
 ```
 
 ### 2. Chat Completion Request (TinyLlama)
 ```bash
-curl --location 'http://localhost:4000/v1/chat/completions' \
+curl --location 'http://localhost:8080/v1/chat/completions' \
 --header 'Content-Type: application/json' \
---header 'Authorization: Bearer sk-super-secret-key' \
+--header 'Authorization: Bearer sk-your-generated-key' \
 --data '{
   "model": "tinyllama",
   "messages": [
     {
       "role": "user",
-      "content": "Why is the sky blue? Answer in one sentence."
+      "content": "Why is the sky blue?"
     }
   ],
   "temperature": 0.2
-}'
-```
-
-### 3. Chat Completion Request (Qwen)
-```bash
-curl --location 'http://localhost:4000/v1/chat/completions' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer sk-super-secret-key' \
---data '{
-  "model": "qwen-small",
-  "messages": [
-    {
-      "role": "user",
-      "content": "What is the capital of France?"
-    }
-  ],
-  "temperature": 0.0
 }'
 ```

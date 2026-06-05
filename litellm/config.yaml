@@ -13,4 +13,4 @@ model_list:
       api_key: dummy
 
 general_settings:
-  master_key: sk-super-secret-key
+  master_key: os.environ/LITELLM_MASTER_KEY

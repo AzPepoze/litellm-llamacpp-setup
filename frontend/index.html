@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiteLLM Gateway Admin Dashboard</title>
+  <!-- Google Fonts: Outfit (modern sans-serif) & JetBrains Mono (monospace for keys) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <h1>LiteLLM <span>Admin Gateway</span></h1>
+      </div>
+      <div class="header-badge">
+        <span class="pulse-indicator"></span>
+        <span class="badge-text">Secure Nginx Gateway Active</span>
+      </div>
+    </header>
+
+    <!-- Metrics Summary -->
+    <section class="metrics-grid">
+      <div class="metric-card" id="card-active-keys">
+        <div class="metric-info">
+          <span class="metric-label">Active Virtual Keys</span>
+          <h2 class="metric-value" id="val-active-keys">0</h2>
+        </div>
+        <div class="metric-icon bg-blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="metric-card" id="card-total-spend">
+        <div class="metric-info">
+          <span class="metric-label">Total Gateway Spend</span>
+          <h2 class="metric-value" id="val-total-spend">$0.0000</h2>
+        </div>
+        <div class="metric-icon bg-green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="metric-card" id="card-total-budget">
+        <div class="metric-info">
+          <span class="metric-label">Allocated Budget Limit</span>
+          <h2 class="metric-value" id="val-total-budget">$0.00</h2>
+        </div>
+        <div class="metric-icon bg-purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="16"/>
+            <line x1="8" y1="12" x2="16" y2="12"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Content Area -->
+    <main class="dashboard-content">
+      <!-- Create Key Section -->
+      <section class="dashboard-panel key-generator-panel">
+        <div class="panel-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="panel-icon">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+          </svg>
+          <h3>Generate Virtual API Key</h3>
+        </div>
+        <form id="key-generator-form" class="generator-form">
+          <div class="form-group">
+            <label for="key-alias">Key Description / Alias</label>
+            <input type="text" id="key-alias" placeholder="e.g. Frontend Team, Dev Testing" required>
+          </div>
+
+          <div class="form-group">
+            <label>Allowed Models</label>
+            <div id="models-checklist" class="models-checklist">
+              <!-- Dynamically populated -->
+              <span class="loading-placeholder">Loading model options...</span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="max-budget">Spend Limit (USD)</label>
+              <input type="number" step="0.01" min="0" id="max-budget" placeholder="Omit for unlimited">
+            </div>
+
+            <div class="form-group">
+              <label for="rpm-limit">Requests / Min (RPM)</label>
+              <input type="number" min="0" id="rpm-limit" placeholder="Omit for unlimited">
+            </div>
+
+            <div class="form-group">
+              <label for="tpm-limit">Tokens / Min (TPM)</label>
+              <input type="number" min="0" id="tpm-limit" placeholder="Omit for unlimited">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="btn-submit-key">
+            <span>Generate Virtual Key</span>
+            <div class="spinner" id="btn-spinner"></div>
+          </button>
+        </form>
+      </section>
+
+      <!-- Keys List Section -->
+      <section class="dashboard-panel keys-list-panel">
+        <div class="panel-header">
+          <div class="panel-title-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="panel-icon">
+              <path d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+            <h3>Active Virtual Keys</h3>
+          </div>
+          <button class="btn btn-secondary btn-icon-only" id="btn-refresh-keys" title="Refresh List">
+            <svg class="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="table-container">
+          <table class="keys-table" id="keys-table">
+            <thead>
+              <tr>
+                <th>Alias</th>
+                <th>Virtual API Key</th>
+                <th>Spend</th>
+                <th>Limits</th>
+                <th>Allowed Models</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="keys-table-body">
+              <tr>
+                <td colspan="6" class="text-center table-loading">Loading keys from LiteLLM database...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Secure Key Modal (Shows generated key once) -->
+  <div class="modal-backdrop" id="modal-key-display">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </div>
+        <h3>API Key Generated Successfully!</h3>
+      </div>
+      <div class="modal-body">
+        <p class="modal-warning">
+          <strong>Important:</strong> Copy this key now. For your security, this key is only visible once. You will not be able to retrieve it again from the dashboard.
+        </p>
+        <div class="key-box">
+          <code id="new-key-value">sk-some-newly-generated-key</code>
+          <button class="btn btn-copy" id="btn-modal-copy" title="Copy to clipboard">
+            <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span id="copy-btn-text">Copy Key</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-modal-close">Close Dashboard Panel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
