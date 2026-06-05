@@ -1,5 +1,0 @@
-default 0;
-
-"Bearer key-user-1" 1;
-"Bearer key-user-2" 1;
-"Bearer admin-key" 1;
