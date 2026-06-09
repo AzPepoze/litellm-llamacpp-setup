@@ -66,6 +66,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://litellm:litellm-secret-pass@postgres:5432/litellm
       - LITELLM_MASTER_KEY=sk-super-secret-key
+      - STORE_MODEL_IN_DB=True
     volumes:
       - ./litellm/config.yaml:/app/config.yaml
     command:
