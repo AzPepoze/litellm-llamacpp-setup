@@ -16,6 +16,9 @@ services:
       --port 8080
       --ctx-size 2048
       --threads 4
+    networks:
+          - default
+          - gateway-net
 
   qwen-small:
     image: ghcr.io/ggml-org/llama.cpp:server
@@ -33,6 +36,9 @@ services:
       --port 8080
       --ctx-size 2048
       --threads 4
+    networks:
+          - default
+          - gateway-net
 
   postgres:
     image: postgres:15-alpine
@@ -49,6 +55,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+          - default
+          - gateway-net
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
@@ -72,6 +81,13 @@ services:
     command:
       - "--config"
       - "/app/config.yaml"
+    networks:
+          - default
+          - gateway-net
 
+networks:
+  gateway-net:
+    external: true
+    
 volumes:
   postgres_data:
