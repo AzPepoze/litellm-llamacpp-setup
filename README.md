@@ -1,140 +1,50 @@
-# LiteLLM LLM Server & Gateway with Admin UI
+# litellm-llamacpp-setup
 
-A production-ready, multi-container LLM gateway. This setup exposes **LiteLLM directly on host port 4000** for key-management and routing API requests to local backends (llama.cpp) or external APIs, using a stateful PostgreSQL database container for metadata storage.
+Run local GGUF models with GPU, and use them through one OpenAI-compatible API.
 
-Access is routed directly:
-*   **Official Admin UI:** Access at **`http://localhost:4000/ui/`** (make sure to include the trailing slash!).
-*   **LLM API Gateway:** Route requests to **`http://localhost:4000/v1/*`**.
+- `llama-cpp` serves models on `http://localhost:8080`
+- `litellm` is the gateway on `http://localhost:4000` (+ Admin UI at `/ui`)
 
----
+## You need
 
-## Table of Contents
-1. [Architecture & Flow](#architecture--flow)
-2. [Project Structure](#project-structure)
-3. [Prerequisites](#prerequisites)
-4. [Deployment Guide](#deployment-guide)
-5. [Adding new models (vLLM, Ollama, APIs)](#adding-new-models)
-6. [Verifying API Requests](#verifying-api-requests)
+- Docker + NVIDIA GPU
+- A `.gguf` model file
 
----
+## Setup
 
-## Architecture & Flow
-
-```mermaid
-graph TD
-    Client[Client App / Admin Browser] -->|Port 4000| LiteLLM[LiteLLM Proxy<br/>Port 4000 Exposed]
-    
-    LiteLLM -->|Saves Keys & Spend| Postgres[(PostgreSQL DB<br/>Port 5432 Internal)]
-    
-    subgraph Model Runtimes
-        LiteLLM -->|GGUF Queries| TinyLlama[TinyLlama Container]
-        LiteLLM -->|GGUF Queries| Qwen[Qwen Container]
-    end
-```
-
-### Key Security & Operational Benefits
-*   **Direct Access (Port 4000):** LiteLLM maps directly to port `4000` on the host system. Internal database query requests and inference traffic route securely within the docker network.
-*   **Stateful Key Persistence:** Virtual API keys, model rate limits (TPM/RPM), and team budgets are stored persistently in PostgreSQL.
-
----
-
-## Project Structure
-
+1. Create env files:
 ```bash
-.
-├── docker-compose.yaml     # Service orchestrator (Database, LiteLLM)
-└── litellm/
-    └── config.yaml         # LiteLLM routing rules and model definitions
+cp litellm/.env.example litellm/.env
+cp llama-cpp/.env.example llama-cpp/.env
 ```
 
----
+2. Edit them — just change the secrets:
+- `litellm/.env`: set `POSTGRES_PASSWORD` and `LITELLM_MASTER_KEY`
+- `llama-cpp/.env`: set `LLAMA_CPP_API_KEY`
 
-## Prerequisites
+3. Put your model in `llama-cpp/models/`, then declare it in `llama-cpp/presets.ini`:
+```ini
+[my-model]
+model = /models/my-model/my-model.gguf
+ctx-size = 8192
+load-on-startup = true
+```
 
-Ensure you have the following installed on your system:
-*   [Docker](https://docs.google.com/get-docker/)
-*   [Docker Compose V2](https://docs.google.com/compose/)
-*   [Git](https://git-scm.com/)
-
----
-
-## Deployment Guide
-
-### Step 1: Start the Containers
+4. Start both services:
 ```bash
-docker compose up -d --build
+docker compose -f llama-cpp/docker-compose.yaml up -d
+docker compose -f litellm/docker-compose.yaml up -d
 ```
 
-### Step 2: Open the Admin UI
-Navigate to:
-👉 **[http://localhost:4000/ui/](http://localhost:4000/ui/)**
+## Use it
 
-Enter the configured master key **`sk-super-secret-key`** as the token to start using the official LiteLLM UI for managing virtual keys.
-
----
-
-## Adding New Models
-
-You can customize or add models by mapping them inside `docker-compose.yaml` and registering them in `litellm/config.yaml`.
-
-### 1. Adding a vLLM Container
-In [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml), add:
-```yaml
-  vllm-server:
-    image: vllm/vllm-openai:latest
-    container_name: vllm-server
-    restart: unless-stopped
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    ipc: host
-    command: --model facebook/opt-125m
-```
-
-In [litellm/config.yaml](file:///home/bwrpsp/proj/LLM/litellm/config.yaml), add:
-```yaml
-model_list:
-  - model_name: my-vllm-model
-    litellm_params:
-      model: openai/facebook/opt-125m
-      api_base: http://vllm-server:8000/v1
-      api_key: dummy
-```
-
-### 2. Adding Commercial APIs (OpenAI, Anthropic, Gemini)
-Pass your provider API key in the environment block of the `litellm` service inside [docker-compose.yaml](file:///home/bwrpsp/proj/LLM/docker-compose.yaml), then add them to your model list:
-```yaml
-model_list:
-  - model_name: gpt-4o
-    litellm_params:
-      model: gpt-4o
-      api_key: "os.environ/OPENAI_API_KEY"
-```
-
----
-
-## Verifying API Requests
-
-Once you generate a virtual key (e.g., `sk-12345...`) from the Admin UI, use it to query models through the gateway.
-
-### 1. List Available Models
+1. Open `http://localhost:4000/ui/` and add `my-model` pointing to `http://host.docker.internal:8080/v1`.
+2. Call it like OpenAI:
 ```bash
-curl --location 'http://localhost:4000/v1/models' \
---header 'Authorization: Bearer sk-your-generated-key'
+curl http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-### 2. Chat Completion Request (TinyLlama)
-```bash
-curl --location 'http://localhost:4000/v1/chat/completions' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer sk-your-generated-key' \
---data '{
-  "model": "tinyllama",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Why is the sky blue?"
-    }
-  ],
-  "temperature": 0.2
-}'
-```
+That's it. Models are managed in the LiteLLM UI, weights stay in `llama-cpp/models/` (ignored by git).

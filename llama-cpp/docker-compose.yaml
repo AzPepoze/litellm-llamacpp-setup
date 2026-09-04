@@ -1,0 +1,33 @@
+services:
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:full-cuda13
+    container_name: llama-cpp
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./models:/models
+      - ./presets.ini:/app/presets.ini
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8080:8080"
+    entrypoint: /app/llama-server
+    command: >
+      --models-preset /app/presets.ini
+      -t 16
+      -tb 16
+      --no-warmup
+      --host 0.0.0.0
+      --port 8080
+      --api-key ${LLAMA_CPP_API_KEY:?LLAMA_CPP_API_KEY is required}
+      --cache-ram 0
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+    networks:
+      - default
