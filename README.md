@@ -23,7 +23,8 @@ cp provider/llamacpp.ini.example provider/llamacpp.ini
 
 1. Edit them — just change the secrets:
 
-- `litellm/.env`: set `POSTGRES_PASSWORD` and `LITELLM_MASTER_KEY`
+- `litellm/.env`: set `POSTGRES_PASSWORD` and `LITELLM_ADMIN_PASSWORD`
+  (optional: `LITELLM_PORT`, default `4000`, for the host-side port)
 - `llama-cpp/.env`: set `LLAMA_CPP_API_KEY`
 - `provider/llamacpp.ini`: one section per llama.cpp server with its
   `base_url` (reachable **from inside** the litellm container, so use a LAN
@@ -69,7 +70,7 @@ auto-synced ones.
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
-  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  -H "Authorization: Bearer $LITELLM_ADMIN_PASSWORD" \
   -H "Content-Type: application/json" \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```

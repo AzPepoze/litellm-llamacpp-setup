@@ -22,22 +22,18 @@ services:
     container_name: litellm
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "${LITELLM_PORT:-4000}:4000"
     depends_on:
       postgres:
         condition: service_healthy
-    # sync-models.sh regenerates /app/config.yaml from the llama.cpp
-    # servers in provider/llamacpp.ini on every (re)start, then execs litellm.
     entrypoint: ["/bin/sh", "/app/sync-models.sh"]
     env_file:
       - .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY is required}
+      - LITELLM_MASTER_KEY=${LITELLM_ADMIN_PASSWORD:?LITELLM_ADMIN_PASSWORD is required}
       - STORE_MODEL_IN_DB=True
     volumes:
-      # NOTE: no ./config.yaml mount — /app/config.yaml is generated
-      # in-container by the entrypoint from config.template.yaml.
       - ./sync-models.sh:/app/sync-models.sh:ro
       - ./config.template.yaml:/app/config.template.yaml:ro
       - ../provider:/app/provider:ro
