@@ -10,3 +10,22 @@
 base_url = http://example:8080/v1
 api_key = sk-change-me
 # model_prefix = example-
+# Optional per-server overrides for the generated LiteLLM model_info /
+# litellm_params. Everything else is auto-mapped from GET <base_url>/models
+# (mode, max_tokens/max_input_tokens from meta.n_ctx, supports_vision from
+# input_modalities, zero costs). Uncomment to override:
+# mode = chat                      # or: embedding
+# max_input_tokens = 131072
+# max_output_tokens = 8192
+# input_cost_per_token = 0.0
+# output_cost_per_token = 0.0
+# supports_vision = true
+# supports_function_calling = true
+# supports_parallel_function_calling = true
+# supports_response_schema = true
+# supports_system_messages = true
+# timeout = 600
+# stream_timeout = 600
+# max_retries = 2
+# tpm = 1000000
+# rpm = 1000

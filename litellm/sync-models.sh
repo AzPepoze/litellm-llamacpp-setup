@@ -10,6 +10,23 @@
 # has no curl/jq. A malformed ini fails fast; an unreachable server is
 # skipped after SYNC_WAIT_TIMEOUT so one dead box can't stop the gateway.
 #
+# Beyond model/api_base/api_key, every model entry also gets a `model_info`
+# block mapped from the llama.cpp /v1/models payload, so the LiteLLM UI
+# shows data instead of "Not Set":
+#   auto-detected : mode (chat, or embedding when output_modalities or the
+#                   id suggests it), max_tokens + max_input_tokens from
+#                   meta.n_ctx, supports_vision from input_modalities,
+#                   supports_audio_input ditto, supports_system_messages
+#                   and supports_response_schema (both always true —
+#                   llama.cpp serves system roles and grammar-constrained
+#                   JSON schema), zero input/output costs (local inference).
+#   ini overrides : mode, max_input_tokens, max_output_tokens,
+#                   input_cost_per_token, output_cost_per_token,
+#                   supports_vision, supports_function_calling,
+#                   supports_parallel_function_calling,
+#                   supports_response_schema, supports_system_messages,
+#                   timeout, stream_timeout, max_retries, tpm, rpm.
+#
 # Env overrides (also used for offline dry-runs):
 #   PROVIDERS_INI       default /app/provider/llamacpp.ini
 #   TEMPLATE_YAML       default /app/config.template.yaml
@@ -69,7 +86,38 @@ def yq(s):  # minimal double-quoted YAML scalar
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-entries = []  # (model_name, litellm_model, api_base, api_key)
+def ybool(b):
+    return "true" if b else "false"
+
+
+def bool_opt(section, key):
+    v = cp.get(section, key, fallback="").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    if v:
+        sys.exit(f"sync-models: ERROR: [{section}] {key} must be "
+                 f"true/false, got {v!r}")
+    return None
+
+
+def num_opt(section, key, numtype):
+    v = cp.get(section, key, fallback="").strip()
+    if not v:
+        return None
+    try:
+        return numtype(v)
+    except ValueError:
+        sys.exit(f"sync-models: ERROR: [{section}] {key} must be a "
+                 f"number, got {v!r}")
+
+
+def is_int(x):
+    return isinstance(x, int) and not isinstance(x, bool)
+
+
+entries = []  # dicts: name, mid, base_url, api_key, params, info
 seen = set()
 for section in cp.sections():
     try:
@@ -80,10 +128,30 @@ for section in cp.sections():
     if not base_url or not api_key:
         sys.exit(f"sync-models: ERROR: [{section}] needs base_url and api_key")
     prefix = cp.get(section, "model_prefix", fallback="").strip()
+    ini_mode = cp.get(section, "mode", fallback="").strip() or None
+    ov_max_in = num_opt(section, "max_input_tokens", int)
+    ov_max_out = num_opt(section, "max_output_tokens", int)
+    ov_vision = bool_opt(section, "supports_vision")
+    ov_func = bool_opt(section, "supports_function_calling")
+    ov_parallel = bool_opt(section, "supports_parallel_function_calling")
+    ov_schema = bool_opt(section, "supports_response_schema")
+    ov_system = bool_opt(section, "supports_system_messages")
+    v = num_opt(section, "input_cost_per_token", float)
+    in_cost = 0.0 if v is None else v
+    v = num_opt(section, "output_cost_per_token", float)
+    out_cost = 0.0 if v is None else v
+    params = {}
+    for key, numtype in (("timeout", float), ("stream_timeout", float),
+                         ("max_retries", int), ("tpm", int), ("rpm", int)):
+        v = num_opt(section, key, numtype)
+        if v is not None:
+            params[key] = v
     models = fetch_models(base_url, api_key)
     print(f"sync-models: [{section}] discovered {len(models)} model(s)", file=sys.stderr)
     for m in models:
-        mid = m.get("id", "") if isinstance(m, dict) else ""
+        if not isinstance(m, dict):
+            continue
+        mid = m.get("id", "")
         if not mid:
             continue
         name = f"{prefix}{mid}"
@@ -92,19 +160,66 @@ for section in cp.sections():
                   f"keeping first", file=sys.stderr)
             continue
         seen.add(name)
-        entries.append((name, mid, base_url, api_key))
+        arch = m.get("architecture") or {}
+        in_mod = [str(x).lower() for x in (arch.get("input_modalities") or [])]
+        out_mod = [str(x).lower() for x in (arch.get("output_modalities") or [])]
+        meta = m.get("meta") or {}
+        n_ctx = meta.get("n_ctx")
+        if ini_mode:
+            mode = ini_mode
+        elif any("embed" in x for x in out_mod) or "embed" in mid.lower():
+            mode = "embedding"
+        else:
+            mode = "chat"
+        max_in = (ov_max_in if ov_max_in is not None
+                  else (n_ctx if is_int(n_ctx) else None))
+        info = {"mode": mode}
+        if max_in:
+            info["max_tokens"] = max_in
+            info["max_input_tokens"] = max_in
+        if ov_max_out:
+            info["max_output_tokens"] = ov_max_out
+        info["supports_vision"] = (ov_vision if ov_vision is not None
+                                    else ("image" in in_mod))
+        info["supports_audio_input"] = "audio" in in_mod
+        info["supports_system_messages"] = (ov_system if ov_system is not None
+                                             else True)
+        info["supports_response_schema"] = (ov_schema if ov_schema is not None
+                                             else True)
+        if ov_func is not None:
+            info["supports_function_calling"] = ov_func
+        if ov_parallel is not None:
+            info["supports_parallel_function_calling"] = ov_parallel
+        info["input_cost_per_token"] = in_cost
+        info["output_cost_per_token"] = out_cost
+        entries.append({"name": name, "mid": mid, "base_url": base_url,
+                        "api_key": api_key, "params": params, "info": info})
 
 with open(template_path) as f:
     template = f.read()
 
+def ynum(v):  # ints plain, floats with repr so 0.0 stays 0.0
+    return repr(v) if isinstance(v, float) else str(v)
+
+
 if entries:
     lines = []
-    for name, mid, base_url, api_key in entries:
-        lines.append(f"  - model_name: {yq(name)}")
+    for e in entries:
+        lines.append(f"  - model_name: {yq(e['name'])}")
         lines.append("    litellm_params:")
-        lines.append(f"      model: {yq('openai/' + mid)}")
-        lines.append(f"      api_base: {yq(base_url)}")
-        lines.append(f"      api_key: {yq(api_key)}")
+        lines.append(f"      model: {yq('openai/' + e['mid'])}")
+        lines.append(f"      api_base: {yq(e['base_url'])}")
+        lines.append(f"      api_key: {yq(e['api_key'])}")
+        for key, val in e["params"].items():
+            lines.append(f"      {key}: {ynum(val)}")
+        lines.append("    model_info:")
+        for key, val in e["info"].items():
+            if isinstance(val, bool):
+                lines.append(f"      {key}: {ybool(val)}")
+            elif isinstance(val, (int, float)):
+                lines.append(f"      {key}: {ynum(val)}")
+            else:
+                lines.append(f"      {key}: {yq(str(val))}")
     block = "model_list:\n" + "\n".join(lines)
 else:
     block = "model_list: []"

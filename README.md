@@ -52,17 +52,26 @@ docker compose -f llama-cpp/docker-compose.yaml up -d
 docker compose -f litellm/docker-compose.yaml up -d
 ```
 
-## How auto-sync works
+## Providers
 
-The `litellm` container starts via `litellm/sync-models.sh`, which queries
-`GET <base_url>/models` on every configured server and
-writes the discovered ids into its config as `openai/<id>` entries. Servers
-are listed in `litellm/provider/llamacpp.ini`. So every
-`docker restart litellm` (or host reboot) re-registers whatever llama.cpp
-currently serves — no manual UI step. Static config lives in
-`litellm/config.template.yaml`; the generated `litellm/config.yaml` is
-git-ignored. UI-added models still persist in Postgres alongside the
-auto-synced ones.
+`litellm/provider/llamacpp.ini` tells the gateway where your llama.cpp
+servers live. It has one block per server:
+
+```ini
+[beast-gpu]
+base_url = http://beast-gpu:8080/v1
+api_key = sk-your-key-here
+# model_prefix = beast-  (optional)
+```
+
+- `base_url` — the server address **as seen from inside the gateway
+  container**. `localhost` does not work here; use the machine's LAN
+  hostname or IP (like `http://beast-gpu:8080/v1`).
+- `api_key` — must match that server's `LLAMA_CPP_API_KEY`.
+- `model_prefix` (optional) — only needed with 2+ servers, avoids name
+  clashes. More overrides are commented-out in the `.example` file.
+
+The rest fills in by itself.
 
 ## Use it
 
@@ -76,7 +85,14 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-That's it. Weights (`llama-cpp/models/`), secrets (`*.env`), your
-`llama-cpp/presets.ini`, `litellm/provider/llamacpp.ini`, and the generated
-`litellm/config.yaml` are all ignored by git — only the `*.example` /
-`*.template` files are tracked.
+That's it. The files below hold your private stuff, so they stay on your
+machine and are never committed to git:
+
+- `llama-cpp/models/` — your downloaded model weights
+- any `.env` file — passwords and secrets
+- `llama-cpp/presets.ini` — your model setup
+- `litellm/provider/llamacpp.ini` — your server addresses and keys
+- `litellm/config.yaml` — auto-generated every time the gateway starts
+
+Only the `*.example` / `*.template` files are tracked in git. Those are
+blank templates with no secrets in them.
