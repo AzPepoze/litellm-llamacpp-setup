@@ -20,6 +20,9 @@ litellm/provider/*.ini
 # LiteLLM runtime config (generated in-container at startup from config.template.yaml)
 litellm/config.yaml
 
+# LiteLLM sync state (which models are already registered; local only)
+litellm/state/
+
 # Operating System Files
 .DS_Store
 Thumbs.db

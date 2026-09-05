@@ -67,6 +67,8 @@ api_key = sk-your-key-here
 - `model_prefix` (optional) — only needed with 2+ servers, avoids name
   clashes. More overrides are commented-out in the `.example` file.
 
+Only new models are added — models you edit in the UI are left alone.
+
 ## Use it
 
 1. Check `http://localhost:4000/ui/` — your llama.cpp models are already there.
@@ -79,7 +81,7 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-That's it. 
+That's it.
 
 The files below hold your private stuff, so they stay on your
 machine and are never committed to git:

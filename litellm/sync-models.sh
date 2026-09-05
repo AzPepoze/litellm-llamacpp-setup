@@ -6,6 +6,13 @@
 # /app/config.template.yaml + the discovered models. Then it execs the real
 # LiteLLM process, passing through any CMD args (e.g. --config /app/config.yaml).
 #
+# The sync is ADD-ONLY: models already registered in a previous run (tracked
+# in STATE_FILE) are left out of the generated file. LiteLLM stores them in
+# Postgres (STORE_MODEL_IN_DB=True), so afterwards they are pure DB models:
+# editable in the UI, and no restart can overwrite your edits. Only newly
+# discovered models are emitted. To force a full re-sync (e.g. after wiping
+# the database), delete the state file and restart.
+#
 # Fetching is done with embedded python3 (stdlib only): the litellm image
 # has no curl/jq. A malformed ini fails fast; an unreachable server is
 # skipped after SYNC_WAIT_TIMEOUT so one dead box can't stop the gateway.
@@ -31,6 +38,9 @@
 #   PROVIDERS_INI       default /app/provider/llamacpp.ini
 #   TEMPLATE_YAML       default /app/config.template.yaml
 #   CONFIG_OUT          default /app/config.yaml
+#   STATE_FILE          registered-model tracking, default
+#                       /app/state/synced_models.json (persisted via the
+#                       ./state volume; git-ignored)
 #   SYNC_WAIT_TIMEOUT   seconds to wait per server, default 120
 #   SYNC_DRY_RUN=1      write the config and exit (do not exec litellm)
 set -eu
@@ -47,6 +57,7 @@ else
     python3 - "$PROVIDERS_INI" "$TEMPLATE_YAML" "$CONFIG_OUT" "$SYNC_WAIT_TIMEOUT" <<'PYEOF'
 import configparser
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -54,6 +65,40 @@ import urllib.request
 
 ini_path, template_path, out_path, timeout = (
     sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4]))
+state_path = os.environ.get("STATE_FILE", "/app/state/synced_models.json")
+
+
+def load_registered(path):
+    # Returns (names_or_None, corrupted). None means "skip everything":
+    # a corrupt state file must never trigger a mass re-emit, which would
+    # overwrite UI edits in the DB. A missing file means first boot.
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError("state file must contain a JSON list")
+        return set(str(x) for x in data), False
+    except FileNotFoundError:
+        return set(), False
+    except Exception as e:
+        print(f"sync-models: WARNING: ignoring unreadable state file "
+              f"{path} ({e}); emitting no models to protect UI edits. "
+              f"Delete the file to force a full re-sync.", file=sys.stderr)
+        return None, True
+
+
+def save_registered(path, names):
+    try:
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(sorted(names), f, indent=2)
+            f.write("\n")
+    except Exception as e:
+        print(f"sync-models: WARNING: could not write state file "
+              f"{path} ({e}); models may be re-emitted next restart",
+              file=sys.stderr)
 
 cp = configparser.ConfigParser()
 cp.read(ini_path)
@@ -195,6 +240,18 @@ for section in cp.sections():
         entries.append({"name": name, "mid": mid, "base_url": base_url,
                         "api_key": api_key, "params": params, "info": info})
 
+registered, _corrupted = load_registered(state_path)
+if registered is None:
+    new_entries = []
+else:
+    new_entries = [e for e in entries if e["name"] not in registered]
+    skipped = len(entries) - len(new_entries)
+    if skipped:
+        print(f"sync-models: skipping {skipped} already-registered "
+              f"model(s); only new models are emitted", file=sys.stderr)
+    save_registered(state_path, registered | {e["name"] for e in entries})
+entries = new_entries
+
 with open(template_path) as f:
     template = f.read()
 
@@ -239,7 +296,7 @@ if not replaced:
 with open(out_path, "w") as f:
     f.write("\n".join(out_lines) + "\n")
 
-print(f"sync-models: wrote {len(entries)} model(s) to {out_path}", file=sys.stderr)
+print(f"sync-models: wrote {len(entries)} new model(s) to {out_path}", file=sys.stderr)
 PYEOF
 fi
 
