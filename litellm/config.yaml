@@ -1,7 +1,0 @@
-# Models are managed via the LiteLLM Admin UI (http://localhost:4000/ui/)
-# and persisted to PostgreSQL (STORE_MODEL_IN_DB=True in docker-compose.yaml).
-# Keep this file minimal - add/edit models in the UI, not here.
-model_list: []
-
-general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY

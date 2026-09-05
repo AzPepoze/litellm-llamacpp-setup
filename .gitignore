@@ -9,6 +9,17 @@ models/**/*
 .env.*
 !.env.example
 
+# llama.cpp presets (real config ignored, template tracked)
+llama-cpp/presets.ini
+!llama-cpp/presets.ini.example
+
+# llama.cpp provider endpoints (real list ignored, template tracked)
+provider/*.ini
+!provider/*.ini.example
+
+# LiteLLM runtime config (generated in-container at startup from config.template.yaml)
+litellm/config.yaml
+
 # Operating System Files
 .DS_Store
 Thumbs.db

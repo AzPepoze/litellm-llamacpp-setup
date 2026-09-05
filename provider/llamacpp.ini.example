@@ -1,0 +1,14 @@
+# llama.cpp provider endpoints for LiteLLM auto-sync (litellm/sync-models.sh).
+# Copy to llamacpp.ini and fill in real values. llamacpp.ini is git-ignored.
+#
+# One [section] per llama.cpp server. The section name is only a label.
+# NOTE: this file is read INSIDE the litellm container, so base_url must be
+# reachable FROM that container. `localhost` does NOT work there — use the
+# server's LAN hostname or IP.
+
+[beast-gpu]
+base_url = http://beast-gpu:8080/v1
+# Must match LLAMA_CPP_API_KEY on that server.
+api_key = sk-change-me
+# Optional: prefix model names to avoid id clashes with 2+ servers.
+# model_prefix = beast-
