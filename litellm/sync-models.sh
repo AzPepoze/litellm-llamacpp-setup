@@ -2,103 +2,62 @@
 # Entrypoint wrapper for the litellm container (see litellm/docker-compose.yaml).
 #
 # On every (re)start it queries GET <base_url>/models on each llama.cpp
-# server listed in the providers ini and regenerates /app/config.yaml from
-# /app/config.template.yaml + the discovered models. Then it execs the real
-# LiteLLM process, passing through any CMD args (e.g. --config /app/config.yaml).
+# server listed in the providers ini, writes a model-free /app/config.yaml
+# from /app/config.template.yaml, starts the real LiteLLM process, waits for
+# its API, then registers any discovered-but-unknown models via POST
+# /model/new. Then it waits on LiteLLM, passing through signals.
 #
-# The sync is ADD-ONLY: models already registered in a previous run (tracked
-# in STATE_FILE) are left out of the generated file. LiteLLM stores them in
-# Postgres (STORE_MODEL_IN_DB=True), so afterwards they are pure DB models:
-# editable in the UI, and no restart can overwrite your edits. Only newly
-# discovered models are emitted. To force a full re-sync (e.g. after wiping
-# the database), delete the state file and restart.
+# Why the API and not the config file? LiteLLM marks config-file models as
+# "owned by the file": they can never be edited in the UI (db_model=false).
+# Models created via /model/new are real DB rows — editable, restart-safe.
+# The sync is ADD-ONLY: names already serving are skipped, so UI edits are
+# never overwritten. The database itself is the "already exists" check, so
+# there is no local state file to lose or reset.
 #
-# Fetching is done with embedded python3 (stdlib only): the litellm image
-# has no curl/jq. A malformed ini fails fast; an unreachable server is
-# skipped after SYNC_WAIT_TIMEOUT so one dead box can't stop the gateway.
-#
-# Beyond model/api_base/api_key, every model entry also gets a `model_info`
-# block mapped from the llama.cpp /v1/models payload, so the LiteLLM UI
-# shows data instead of "Not Set":
-#   auto-detected : mode (chat, or embedding when output_modalities or the
-#                   id suggests it), max_tokens + max_input_tokens from
-#                   meta.n_ctx, supports_vision from input_modalities,
-#                   supports_audio_input ditto, supports_system_messages
-#                   and supports_response_schema (both always true —
-#                   llama.cpp serves system roles and grammar-constrained
-#                   JSON schema), zero input/output costs (local inference).
-#   ini overrides : mode, max_input_tokens, max_output_tokens,
-#                   input_cost_per_token, output_cost_per_token,
-#                   supports_vision, supports_function_calling,
-#                   supports_parallel_function_calling,
-#                   supports_response_schema, supports_system_messages,
-#                   timeout, stream_timeout, max_retries, tpm, rpm.
+# Fetching uses embedded python3 (stdlib only): the litellm image has no
+# curl/jq. A malformed ini fails fast (gateway never starts half-configured);
+# anything else — llama.cpp down, gateway API not ready, a rejected POST —
+# only logs an error and the gateway still runs with whatever is in the DB.
 #
 # Env overrides (also used for offline dry-runs):
 #   PROVIDERS_INI       default /app/provider/llamacpp.ini
 #   TEMPLATE_YAML       default /app/config.template.yaml
 #   CONFIG_OUT          default /app/config.yaml
-#   STATE_FILE          registered-model tracking, default
-#                       /app/state/synced_models.json (persisted via the
-#                       ./state volume; git-ignored)
-#   SYNC_WAIT_TIMEOUT   seconds to wait per server, default 120
-#   SYNC_DRY_RUN=1      write the config and exit (do not exec litellm)
+#   DISCOVERED_JSON     discovered-model handoff, default /tmp/sync-models-discovered.json
+#   GATEWAY_URL         LiteLLM API base, default http://127.0.0.1:4000
+#   GATEWAY_BIN         gateway binary, default litellm (tests stub it)
+#   GATEWAY_WAIT_TIMEOUT seconds to wait for the API, default 180
+#   SYNC_WAIT_TIMEOUT   seconds to wait per llama.cpp server, default 120
+#   SYNC_DRY_RUN=1      discover + write config, print what would be
+#                       registered, and exit (do not start the gateway)
+#   LITELLM_MASTER_KEY  required for API auth (already in container env)
 set -eu
 
 PROVIDERS_INI="${PROVIDERS_INI:-/app/provider/llamacpp.ini}"
 TEMPLATE_YAML="${TEMPLATE_YAML:-/app/config.template.yaml}"
 CONFIG_OUT="${CONFIG_OUT:-/app/config.yaml}"
+DISCOVERED_JSON="${DISCOVERED_JSON:-/tmp/sync-models-discovered.json}"
+GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:4000}"
+GATEWAY_BIN="${GATEWAY_BIN:-litellm}"
 SYNC_WAIT_TIMEOUT="${SYNC_WAIT_TIMEOUT:-120}"
+GATEWAY_WAIT_TIMEOUT="${GATEWAY_WAIT_TIMEOUT:-180}"
 
 if [ ! -f "$PROVIDERS_INI" ]; then
     echo "sync-models: WARNING: $PROVIDERS_INI not found, starting with template config" >&2
     cp "$TEMPLATE_YAML" "$CONFIG_OUT"
+    printf '[]' >"$DISCOVERED_JSON"
 else
-    python3 - "$PROVIDERS_INI" "$TEMPLATE_YAML" "$CONFIG_OUT" "$SYNC_WAIT_TIMEOUT" <<'PYEOF'
+    python3 - "$PROVIDERS_INI" "$TEMPLATE_YAML" "$CONFIG_OUT" "$DISCOVERED_JSON" \
+        "$SYNC_WAIT_TIMEOUT" <<'PYEOF'
 import configparser
 import json
-import os
 import sys
 import time
 import urllib.error
 import urllib.request
 
-ini_path, template_path, out_path, timeout = (
-    sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4]))
-state_path = os.environ.get("STATE_FILE", "/app/state/synced_models.json")
-
-
-def load_registered(path):
-    # Returns (names_or_None, corrupted). None means "skip everything":
-    # a corrupt state file must never trigger a mass re-emit, which would
-    # overwrite UI edits in the DB. A missing file means first boot.
-    try:
-        with open(path) as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            raise ValueError("state file must contain a JSON list")
-        return set(str(x) for x in data), False
-    except FileNotFoundError:
-        return set(), False
-    except Exception as e:
-        print(f"sync-models: WARNING: ignoring unreadable state file "
-              f"{path} ({e}); emitting no models to protect UI edits. "
-              f"Delete the file to force a full re-sync.", file=sys.stderr)
-        return None, True
-
-
-def save_registered(path, names):
-    try:
-        parent = os.path.dirname(path)
-        if parent:
-            os.makedirs(parent, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(sorted(names), f, indent=2)
-            f.write("\n")
-    except Exception as e:
-        print(f"sync-models: WARNING: could not write state file "
-              f"{path} ({e}); models may be re-emitted next restart",
-              file=sys.stderr)
+ini_path, template_path, out_path, disc_path, timeout = (
+    sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], float(sys.argv[5]))
 
 cp = configparser.ConfigParser()
 cp.read(ini_path)
@@ -240,69 +199,137 @@ for section in cp.sections():
         entries.append({"name": name, "mid": mid, "base_url": base_url,
                         "api_key": api_key, "params": params, "info": info})
 
-registered, _corrupted = load_registered(state_path)
-if registered is None:
-    new_entries = []
-else:
-    new_entries = [e for e in entries if e["name"] not in registered]
-    skipped = len(entries) - len(new_entries)
-    if skipped:
-        print(f"sync-models: skipping {skipped} already-registered "
-              f"model(s); only new models are emitted", file=sys.stderr)
-    save_registered(state_path, registered | {e["name"] for e in entries})
-entries = new_entries
-
 with open(template_path) as f:
     template = f.read()
 
-def ynum(v):  # ints plain, floats with repr so 0.0 stays 0.0
-    return repr(v) if isinstance(v, float) else str(v)
-
-
-if entries:
-    lines = []
-    for e in entries:
-        lines.append(f"  - model_name: {yq(e['name'])}")
-        lines.append("    litellm_params:")
-        lines.append(f"      model: {yq('openai/' + e['mid'])}")
-        lines.append(f"      api_base: {yq(e['base_url'])}")
-        lines.append(f"      api_key: {yq(e['api_key'])}")
-        for key, val in e["params"].items():
-            lines.append(f"      {key}: {ynum(val)}")
-        lines.append("    model_info:")
-        for key, val in e["info"].items():
-            if isinstance(val, bool):
-                lines.append(f"      {key}: {ybool(val)}")
-            elif isinstance(val, (int, float)):
-                lines.append(f"      {key}: {ynum(val)}")
-            else:
-                lines.append(f"      {key}: {yq(str(val))}")
-    block = "model_list:\n" + "\n".join(lines)
-else:
-    block = "model_list: []"
-
-out_lines = []
-replaced = False
-for line in template.splitlines():
-    if not replaced and line.strip() == "model_list: []":
-        out_lines.append(block)
-        replaced = True
-    else:
-        out_lines.append(line)
-if not replaced:
+# The file stays model-free on purpose: anything listed here becomes an
+# uneditable config-owned model. The DB owns all models (see API phase).
+if "model_list: []" not in [line.strip() for line in template.splitlines()]:
     sys.exit("sync-models: ERROR: no 'model_list: []' line in template, "
              "refusing to guess where models go")
-
 with open(out_path, "w") as f:
-    f.write("\n".join(out_lines) + "\n")
+    f.write(template if template.endswith("\n") else template + "\n")
 
-print(f"sync-models: wrote {len(entries)} new model(s) to {out_path}", file=sys.stderr)
+with open(disc_path, "w") as f:
+    json.dump(entries, f)
+
+print(f"sync-models: discovered {len(entries)} model(s), wrote model-free config",
+      file=sys.stderr)
 PYEOF
 fi
 
 if [ "${SYNC_DRY_RUN:-0}" = "1" ]; then
+    echo "sync-models: dry run, these would be registered if unknown:" >&2
+    python3 -c "import json,sys; [print('  -', e['name']) for e in json.load(open('$DISCOVERED_JSON'))]"
     echo "sync-models: dry run, not starting litellm" >&2
     exit 0
 fi
 
-exec litellm "$@"
+"$GATEWAY_BIN" "$@" &
+gw_pid=$!
+_term() { kill -TERM "$gw_pid" 2>/dev/null || true; }
+trap _term TERM INT
+
+# Register unknown models as real DB rows. Never fatal: any failure just
+# logs and the gateway keeps serving whatever is already in the DB.
+python3 - "$DISCOVERED_JSON" <<'PYEOF'
+import json
+import os
+import sys
+import time
+import urllib.request
+
+disc_path = sys.argv[1]
+gw = os.environ.get("GATEWAY_URL", "http://127.0.0.1:4000").rstrip("/")
+wait_timeout = float(os.environ.get("GATEWAY_WAIT_TIMEOUT", "180"))
+master = os.environ.get("LITELLM_MASTER_KEY", "")
+
+try:
+    with open(disc_path) as f:
+        discovered = json.load(f)
+except Exception as e:
+    print(f"sync-models: WARNING: cannot read {disc_path} ({e}); "
+          f"skipping API sync", file=sys.stderr)
+    sys.exit(0)
+if not discovered:
+    sys.exit(0)
+if not master:
+    print("sync-models: ERROR: LITELLM_MASTER_KEY not set; cannot register "
+          "models via API", file=sys.stderr)
+    sys.exit(0)
+
+
+def call(method, path, body=None):
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        gw + path, data=data, method=method,
+        headers={"Authorization": f"Bearer {master}",
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return resp.status, resp.read().decode()
+
+
+def code_of(e):
+    return getattr(e, "code", None)
+
+
+# Wait for the API; /v1/models doubles as the existing-set fetch.
+deadline = time.time() + wait_timeout
+existing = None
+while True:
+    try:
+        st, txt = call("GET", "/v1/models")
+        if st == 200:
+            items = json.loads(txt).get("data", [])
+            existing = {i.get("id") for i in items
+                        if isinstance(i, dict) and i.get("id")}
+            break
+        print(f"sync-models: gateway /v1/models -> {st}, retrying...",
+              file=sys.stderr)
+    except Exception as e:
+        if code_of(e) == 401:
+            print("sync-models: ERROR: gateway rejected the master key (401); "
+                  "check LITELLM_MASTER_KEY", file=sys.stderr)
+            sys.exit(0)
+        print(f"sync-models: gateway not ready ({e}), retrying...",
+              file=sys.stderr)
+    if time.time() >= deadline:
+        print(f"sync-models: ERROR: gateway API not ready after "
+              f"{wait_timeout:.0f}s; models not registered this boot",
+              file=sys.stderr)
+        sys.exit(0)
+    time.sleep(5)
+
+added = 0
+for e in discovered:
+    if e["name"] in existing:
+        continue
+    body = {"model_name": e["name"],
+            "litellm_params": {"model": "openai/" + e["mid"],
+                               "api_base": e["base_url"],
+                               "api_key": e["api_key"],
+                               **e["params"]},
+            "model_info": e["info"]}
+    try:
+        st, txt = call("POST", "/model/new", body)
+    except Exception as ex:
+        if code_of(ex) == 401:
+            print("sync-models: ERROR: gateway rejected the master key (401); "
+                  "stopping registration", file=sys.stderr)
+            break
+        print(f"sync-models: WARNING: registering {e['name']} failed ({ex})",
+              file=sys.stderr)
+        continue
+    if 200 <= st < 300:
+        print(f"sync-models: registered {e['name']} as DB model",
+              file=sys.stderr)
+        added += 1
+        existing.add(e["name"])
+    else:
+        print(f"sync-models: WARNING: registering {e['name']} -> {st}: "
+              f"{txt[:200]}", file=sys.stderr)
+
+print(f"sync-models: registered {added} new model(s) via API", file=sys.stderr)
+PYEOF
+
+wait "$gw_pid"
