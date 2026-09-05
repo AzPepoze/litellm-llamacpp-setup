@@ -24,10 +24,10 @@ CONFIG_OUT="${CONFIG_OUT:-/app/config.yaml}"
 SYNC_WAIT_TIMEOUT="${SYNC_WAIT_TIMEOUT:-120}"
 
 if [ ! -f "$PROVIDERS_INI" ]; then
-  echo "sync-models: WARNING: $PROVIDERS_INI not found, starting with template config" >&2
-  cp "$TEMPLATE_YAML" "$CONFIG_OUT"
+    echo "sync-models: WARNING: $PROVIDERS_INI not found, starting with template config" >&2
+    cp "$TEMPLATE_YAML" "$CONFIG_OUT"
 else
-  python3 - "$PROVIDERS_INI" "$TEMPLATE_YAML" "$CONFIG_OUT" "$SYNC_WAIT_TIMEOUT" <<'PYEOF'
+    python3 - "$PROVIDERS_INI" "$TEMPLATE_YAML" "$CONFIG_OUT" "$SYNC_WAIT_TIMEOUT" <<'PYEOF'
 import configparser
 import json
 import sys
@@ -129,8 +129,8 @@ PYEOF
 fi
 
 if [ "${SYNC_DRY_RUN:-0}" = "1" ]; then
-  echo "sync-models: dry run, not starting litellm" >&2
-  exit 0
+    echo "sync-models: dry run, not starting litellm" >&2
+    exit 0
 fi
 
 exec litellm "$@"

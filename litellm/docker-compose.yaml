@@ -15,7 +15,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-          - default
+      - default
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
@@ -45,7 +45,7 @@ services:
       - "--config"
       - "/app/config.yaml"
     networks:
-          - default
-    
+      - default
+
 volumes:
   postgres_data:
