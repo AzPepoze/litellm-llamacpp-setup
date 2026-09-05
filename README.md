@@ -26,10 +26,6 @@ cp litellm/provider/llamacpp.ini.example litellm/provider/llamacpp.ini
 - `litellm/.env`: set `POSTGRES_PASSWORD` and `LITELLM_ADMIN_PASSWORD`
   (optional: `LITELLM_PORT`, default `4000`, for the host-side port)
 - `llama-cpp/.env`: set `LLAMA_CPP_API_KEY`
-- `litellm/provider/llamacpp.ini`: one section per llama.cpp server with its
-  `base_url` (reachable **from inside** the litellm container, so use a LAN
-  hostname/IP like `http://beast-gpu:8080/v1`, never `localhost`) and its
-  `api_key` (must match that server's `LLAMA_CPP_API_KEY`)
 
 1. Put your model in `llama-cpp/models/`, then declare it in `llama-cpp/presets.ini` by uncommenting and editing one of the template blocks:
 
@@ -71,8 +67,6 @@ api_key = sk-your-key-here
 - `model_prefix` (optional) — only needed with 2+ servers, avoids name
   clashes. More overrides are commented-out in the `.example` file.
 
-The rest fills in by itself.
-
 ## Use it
 
 1. Check `http://localhost:4000/ui/` — your llama.cpp models are already there.
@@ -85,7 +79,9 @@ curl http://localhost:4000/v1/chat/completions \
   -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-That's it. The files below hold your private stuff, so they stay on your
+That's it. 
+
+The files below hold your private stuff, so they stay on your
 machine and are never committed to git:
 
 - `llama-cpp/models/` — your downloaded model weights
@@ -93,6 +89,3 @@ machine and are never committed to git:
 - `llama-cpp/presets.ini` — your model setup
 - `litellm/provider/llamacpp.ini` — your server addresses and keys
 - `litellm/config.yaml` — auto-generated every time the gateway starts
-
-Only the `*.example` / `*.template` files are tracked in git. Those are
-blank templates with no secrets in them.
