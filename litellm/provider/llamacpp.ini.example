@@ -6,9 +6,7 @@
 # reachable FROM that container. `localhost` does NOT work there — use the
 # server's LAN hostname or IP.
 
-[beast-gpu]
-base_url = http://beast-gpu:8080/v1
-# Must match LLAMA_CPP_API_KEY on that server.
+[example]
+base_url = http://example:8080/v1
 api_key = sk-change-me
-# Optional: prefix model names to avoid id clashes with 2+ servers.
-# model_prefix = beast-
+# model_prefix = example-

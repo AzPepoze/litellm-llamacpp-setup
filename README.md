@@ -18,7 +18,7 @@ Run local GGUF models with GPU, and use them through one OpenAI-compatible API.
 cp litellm/.env.example litellm/.env
 cp llama-cpp/.env.example llama-cpp/.env
 cp llama-cpp/presets.ini.example llama-cpp/presets.ini
-cp provider/llamacpp.ini.example provider/llamacpp.ini
+cp litellm/provider/llamacpp.ini.example litellm/provider/llamacpp.ini
 ```
 
 1. Edit them — just change the secrets:
@@ -26,7 +26,7 @@ cp provider/llamacpp.ini.example provider/llamacpp.ini
 - `litellm/.env`: set `POSTGRES_PASSWORD` and `LITELLM_ADMIN_PASSWORD`
   (optional: `LITELLM_PORT`, default `4000`, for the host-side port)
 - `llama-cpp/.env`: set `LLAMA_CPP_API_KEY`
-- `provider/llamacpp.ini`: one section per llama.cpp server with its
+- `litellm/provider/llamacpp.ini`: one section per llama.cpp server with its
   `base_url` (reachable **from inside** the litellm container, so use a LAN
   hostname/IP like `http://beast-gpu:8080/v1`, never `localhost`) and its
   `api_key` (must match that server's `LLAMA_CPP_API_KEY`)
@@ -55,8 +55,9 @@ docker compose -f litellm/docker-compose.yaml up -d
 ## How auto-sync works
 
 The `litellm` container starts via `litellm/sync-models.sh`, which queries
-`GET <base_url>/models` on every server in `provider/llamacpp.ini` and
-writes the discovered ids into its config as `openai/<id>` entries. So every
+`GET <base_url>/models` on every configured server and
+writes the discovered ids into its config as `openai/<id>` entries. Servers
+are listed in `litellm/provider/llamacpp.ini`. So every
 `docker restart litellm` (or host reboot) re-registers whatever llama.cpp
 currently serves — no manual UI step. Static config lives in
 `litellm/config.template.yaml`; the generated `litellm/config.yaml` is
@@ -76,6 +77,6 @@ curl http://localhost:4000/v1/chat/completions \
 ```
 
 That's it. Weights (`llama-cpp/models/`), secrets (`*.env`), your
-`llama-cpp/presets.ini`, `provider/llamacpp.ini`, and the generated
+`llama-cpp/presets.ini`, `litellm/provider/llamacpp.ini`, and the generated
 `litellm/config.yaml` are all ignored by git — only the `*.example` /
 `*.template` files are tracked.

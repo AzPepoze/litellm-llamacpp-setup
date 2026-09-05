@@ -36,7 +36,7 @@ services:
     volumes:
       - ./sync-models.sh:/app/sync-models.sh:ro
       - ./config.template.yaml:/app/config.template.yaml:ro
-      - ../provider:/app/provider:ro
+      - ./provider:/app/provider:ro
     command:
       - "--config"
       - "/app/config.yaml"

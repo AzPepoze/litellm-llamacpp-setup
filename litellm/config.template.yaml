@@ -1,7 +1,7 @@
 # Static part of the LiteLLM config. The generated model_list is inserted
 # at the `model_list: []` line below by sync-models.sh on every container
 # (re)start — do not add models here, they are auto-discovered from the
-# llama.cpp servers in provider/llamacpp.ini. Extra static settings
+# llama.cpp servers in litellm/provider/llamacpp.ini. Extra static settings
 # (general_settings, router_settings, ...) belong in this file.
 # UI-added models are persisted to PostgreSQL (STORE_MODEL_IN_DB=True).
 model_list: []

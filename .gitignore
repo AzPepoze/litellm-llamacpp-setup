@@ -14,8 +14,8 @@ llama-cpp/presets.ini
 !llama-cpp/presets.ini.example
 
 # llama.cpp provider endpoints (real list ignored, template tracked)
-provider/*.ini
-!provider/*.ini.example
+litellm/provider/*.ini
+!litellm/provider/*.ini.example
 
 # LiteLLM runtime config (generated in-container at startup from config.template.yaml)
 litellm/config.yaml
