@@ -1,16 +1,24 @@
 import sys
+import threading
+
+_lock = threading.Lock()
+
+
+def _write(line):
+    with _lock:
+        print(line, file=sys.stderr, flush=True)
 
 
 def info(message):
-    print(f"sync-models: {message}", file=sys.stderr)
+    _write(f"sync-models: {message}")
 
 
 def warn(message):
-    print(f"sync-models: WARNING: {message}", file=sys.stderr)
+    _write(f"sync-models: WARNING: {message}")
 
 
 def error(message):
-    print(f"sync-models: ERROR: {message}", file=sys.stderr)
+    _write(f"sync-models: ERROR: {message}")
 
 
 def fail(message):
