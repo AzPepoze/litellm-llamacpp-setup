@@ -1,97 +1,95 @@
 # litellm-llamacpp-setup
 
-Run local GGUF models with GPU, and use them through one OpenAI-compatible API.
+Run models on your NVIDIA GPU and call them all through one OpenAI-compatible API.
 
-- `llama-cpp` serves models on `http://localhost:8080`
-- `litellm` is the gateway on `http://localhost:4000` (+ Admin UI at `/ui`)
-
-## You need
-
-- Docker + NVIDIA GPU
-- A `.gguf` model file
-
-## Setup
-
-1. Create env files, the presets file, and the provider list:
-
-```bash
-cp litellm/.env.example litellm/.env
-cp llama-cpp/.env.example llama-cpp/.env
-cp llama-cpp/presets.ini.example llama-cpp/presets.ini
-cp litellm/provider/llamacpp.ini.example litellm/provider/llamacpp.ini
+```mermaid
+flowchart LR
+    App[Your app] --> LiteLLM[LiteLLM gateway<br/>localhost:4000]
+    LiteLLM --> LlamaCpp[llama.cpp server<br/>localhost:8080]
+    LlamaCpp --> GPU[NVIDIA GPU]
 ```
 
-1. Edit them — just change the secrets:
+| Service | Address | Role |
+|---|---|---|
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | `http://localhost:8080` | Runs the models on the GPU |
+| [LiteLLM](https://docs.litellm.ai) | `http://localhost:4000` | Gateway and API. Admin UI at `/ui` |
 
-- `litellm/.env`: set `POSTGRES_PASSWORD` and `LITELLM_ADMIN_PASSWORD`
-  (optional: `LITELLM_PORT`, default `4000`, for the host-side port)
-- `llama-cpp/.env`: set `LLAMA_CPP_API_KEY`
+## Requirements
 
-1. Pick a model on Hugging Face and declare it in `llama-cpp/presets.ini` by uncommenting and editing one of the template blocks. llama.cpp downloads the model for you:
+- [Docker](https://docs.docker.com/get-docker/) with [Docker Compose](https://docs.docker.com/compose/)
+- NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- Internet access, so llama.cpp can download models from [Hugging Face](https://huggingface.co)
 
-```ini
-[my-chat-model]
-hf-repo = unsloth/Qwen3-8B-GGUF:Q4_K_M
-ctx-size = 8192
-parallel = 2
-repeat-penalty = 1.1
-load-on-startup = true
-```
+## Quick start
 
-| Key | What it does |
-|---|---|
-| `hf-repo` | Hugging Face repo and quant, as `user/repo:quant` |
-| `hf-repo-draft` | Optional small model that speeds up the main model |
+1. Create your config files from the examples.
 
-The template also has examples for vision models, draft models, and embedding models.
+   ```bash
+   cp litellm/.env.example litellm/.env
+   cp llama-cpp/.env.example llama-cpp/.env
+   cp llama-cpp/presets.ini.example llama-cpp/presets.ini
+   cp litellm/provider/llamacpp.ini.example litellm/provider/llamacpp.ini
+   ```
 
-1. Start both services:
+2. Set your secrets.
 
-```bash
-docker compose -f llama-cpp/docker-compose.yaml up -d
-docker compose -f litellm/docker-compose.yaml up -d
-```
+   | File | Set |
+   |---|---|
+   | `litellm/.env` | `POSTGRES_PASSWORD`, `LITELLM_ADMIN_PASSWORD` |
+   | `llama-cpp/.env` | `LLAMA_CPP_API_KEY` |
 
-## Providers
+3. Add a model to `llama-cpp/presets.ini`. Uncomment one example block and set its `hf-repo`. See [Models](docs/models.md).
 
-`litellm/provider/llamacpp.ini` tells the gateway where your llama.cpp
-servers live. It has one block per server:
+4. Point the gateway at your llama.cpp server in `litellm/provider/llamacpp.ini`. See [Providers](docs/providers.md).
 
-```ini
-[beast-gpu]
-base_url = http://beast-gpu:8080/v1
-api_key = sk-your-key-here
-# model_prefix = beast-  (optional)
-```
+   > [!IMPORTANT]
+   > Use the server's LAN hostname or IP, not `localhost`. The gateway runs in Docker, so `localhost` means the gateway container itself.
 
-- `base_url` — the server address **as seen from inside the gateway
-  container**. `localhost` does not work here; use the machine's LAN
-  hostname or IP (like `http://beast-gpu:8080/v1`).
-- `api_key` — must match that server's `LLAMA_CPP_API_KEY`.
-- `model_prefix` (optional) — only needed with 2+ servers, avoids name
-  clashes. More overrides are commented-out in the `.example` file.
+5. Start both services.
 
-Only new models are added — models you edit in the UI are left alone.
+   ```bash
+   docker compose -f llama-cpp/docker-compose.yaml up -d
+   docker compose -f litellm/docker-compose.yaml up -d
+   ```
 
-## Use it
+6. Open `http://localhost:4000/ui/`. Your models should be listed.
 
-1. Check `http://localhost:4000/ui/` — your llama.cpp models are already there.
-2. Call it like OpenAI:
+## Call the API
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
-  -H "Authorization: Bearer $LITELLM_ADMIN_PASSWORD" \
+  -H "Authorization: Bearer <LITELLM_ADMIN_PASSWORD>" \
   -H "Content-Type: application/json" \
-  -d '{"model":"my-model","messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"<model-name>","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-That's it.
+- Replace `<LITELLM_ADMIN_PASSWORD>` with the value in `litellm/.env`. This password is also the API key for your clients.
+- Replace `<model-name>` with the name shown in the Admin UI.
 
-The files below hold your private stuff, so they stay on your
-machine and are never committed to git:
+## Update llama.cpp
 
-- `llama-cpp/models/` — your downloaded model weights
-- any `.env` file — passwords and secrets
-- `llama-cpp/presets.ini` — your model setup
-- `litellm/provider/llamacpp.ini` — your server addresses and keys
-- `litellm/config.yaml` — auto-generated every time the gateway starts
+```bash
+cd llama-cpp
+./update.sh                      # pulls the newest llama.cpp image
+docker compose up -d             # restarts with the new image
+```
+
+## Private files
+
+These files hold your secrets and settings. Git ignores them.
+
+| Path | Holds |
+|---|---|
+| `litellm/.env` | Database and admin passwords |
+| `llama-cpp/.env` | llama.cpp API key |
+| `llama-cpp/presets.ini` | Your model list and settings |
+| `litellm/provider/llamacpp.ini` | Your server addresses and keys |
+| `llama-cpp/models/` | Downloaded model weights |
+| `litellm/config.yaml` | Generated at every gateway start |
+
+## More
+
+| Topic | Page |
+|---|---|
+| Models and presets | [docs/models.md](docs/models.md) |
+| Providers and sync | [docs/providers.md](docs/providers.md) |
