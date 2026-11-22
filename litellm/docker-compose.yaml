@@ -35,6 +35,7 @@ services:
       - STORE_MODEL_IN_DB=True
     volumes:
       - ./sync-models.sh:/app/sync-models.sh:ro
+      - ./sync:/app/sync:ro
       - ./config.template.yaml:/app/config.template.yaml:ro
       - ./provider:/app/provider:ro
     command:
