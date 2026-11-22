@@ -25,9 +25,13 @@ The example file lists more optional overrides, such as `max_input_tokens`, `sup
 
 ## When models are added
 
-- The gateway checks every server at each start.
+- The gateway checks every server when it starts.
+- It checks again every 5 minutes, so new servers and new models appear without a restart.
 - It adds only models it does not know yet.
 - Models you edit in the Admin UI are never overwritten.
+
+> [!NOTE]
+> To change the check interval, set `SYNC_INTERVAL` in `litellm/.env` (seconds). Use `0` to check only at start.
 
 ## Troubleshooting
 
