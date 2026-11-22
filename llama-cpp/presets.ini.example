@@ -1,20 +1,40 @@
 version = 1
 
 [*]
+models-dir = /models
 flash-attn = on
 
 # --- Example chat model ---
 ; [my-chat-model]
-; model = /models/my-chat-model/my-model.gguf
+; hf-repo = unsloth/Qwen3-8B-GGUF:Q4_K_M
 ; ctx-size = 8192
 ; parallel = 2
 ; repeat-penalty = 1.1
 ; load-on-startup = true
-; mmproj = /models/my-chat-model/mmproj.gguf
+
+# --- Example vision model (image input) ---
+; [my-vision-model]
+; hf-repo = ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+; ctx-size = 8192
+; load-on-startup = true
+
+# --- Example vision model with a custom mmproj ---
+; [my-vision-model-custom-mmproj]
+; hf-repo = ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+; mmproj-url = https://huggingface.co/<user>/<repo>/resolve/main/mmproj-model-f16.gguf
+; ctx-size = 8192
+; load-on-startup = true
+
+# --- Example chat model with a draft model (faster output) ---
+; [my-fast-chat-model]
+; hf-repo = unsloth/Qwen3-8B-GGUF:Q4_K_M
+; hf-repo-draft = unsloth/Qwen3-0.6B-GGUF:Q8_0
+; ctx-size = 8192
+; load-on-startup = true
 
 # --- Example embedding model ---
 ; [my-embed-model]
-; model = /models/my-embed-model.gguf
+; hf-repo = ggml-org/bge-m3-GGUF:Q8_0
 ; ctx-size = 2048
 ; parallel = 1
 ; embeddings = true

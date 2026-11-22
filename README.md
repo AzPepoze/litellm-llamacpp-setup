@@ -27,19 +27,23 @@ cp litellm/provider/llamacpp.ini.example litellm/provider/llamacpp.ini
   (optional: `LITELLM_PORT`, default `4000`, for the host-side port)
 - `llama-cpp/.env`: set `LLAMA_CPP_API_KEY`
 
-1. Put your model in `llama-cpp/models/`, then declare it in `llama-cpp/presets.ini` by uncommenting and editing one of the template blocks:
+1. Pick a model on Hugging Face and declare it in `llama-cpp/presets.ini` by uncommenting and editing one of the template blocks. llama.cpp downloads the model for you:
 
 ```ini
 [my-chat-model]
-model = /models/my-chat-model/my-model.gguf
+hf-repo = unsloth/Qwen3-8B-GGUF:Q4_K_M
 ctx-size = 8192
 parallel = 2
 repeat-penalty = 1.1
 load-on-startup = true
-# mmproj = /models/my-chat-model/mmproj.gguf  # vision models only
 ```
 
-(There is also an embedding-model block in the template.)
+| Key | What it does |
+|---|---|
+| `hf-repo` | Hugging Face repo and quant, as `user/repo:quant` |
+| `hf-repo-draft` | Optional small model that speeds up the main model |
+
+The template also has examples for vision models, draft models, and embedding models.
 
 1. Start both services:
 

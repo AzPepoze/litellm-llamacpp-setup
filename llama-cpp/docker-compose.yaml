@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - LLAMA_CACHE=/models
     volumes:
       - ./models:/models
       - ./presets.ini:/app/presets.ini
