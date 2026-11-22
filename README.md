@@ -18,7 +18,6 @@ flowchart LR
 
 - [Docker](https://docs.docker.com/get-docker/) with [Docker Compose](https://docs.docker.com/compose/)
 - NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- Internet access, so llama.cpp can download models from [Hugging Face](https://huggingface.co)
 
 ## Quick start
 
