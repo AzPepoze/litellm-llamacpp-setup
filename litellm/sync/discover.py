@@ -1,6 +1,6 @@
-"""Phase 1: find llama.cpp models and write the model-free LiteLLM config.
+"""Find the models on every llama.cpp server and save them as JSON.
 
-Usage: discover.py PROVIDERS_INI TEMPLATE_YAML CONFIG_OUT DISCOVERED_JSON TIMEOUT
+Usage: discover.py PROVIDERS_INI DISCOVERED_JSON TIMEOUT
 """
 import configparser
 import json
@@ -10,7 +10,7 @@ from itertools import repeat
 
 from ini import read_provider
 from llamacpp import fetch_models
-from log import fail, info, warn
+from log import info, warn
 from model_info import build_entry
 
 
@@ -48,32 +48,16 @@ def discover_entries(cp, timeout):
     return entries
 
 
-def read_template(template_path):
-    with open(template_path) as f:
-        template = f.read()
-    # Keep the file model-free: config-listed models cannot be edited in the UI.
-    if "model_list: []" not in [line.strip() for line in template.splitlines()]:
-        fail("no 'model_list: []' line in template, refusing to guess where models go")
-    return template
-
-
-def write_config(template, out_path):
-    with open(out_path, "w") as f:
-        f.write(template if template.endswith("\n") else template + "\n")
-
-
 def main():
-    ini_path, template_path, out_path, disc_path, timeout = sys.argv[1:6]
+    ini_path, disc_path, timeout = sys.argv[1:4]
 
     cp = configparser.ConfigParser()
     cp.read(ini_path)
 
     entries = discover_entries(cp, float(timeout))
-    template = read_template(template_path)
-    write_config(template, out_path)
     with open(disc_path, "w") as f:
         json.dump(entries, f)
-    info(f"discovered {len(entries)} model(s), wrote model-free config")
+    info(f"found {len(entries)} model(s)")
 
 
 if __name__ == "__main__":

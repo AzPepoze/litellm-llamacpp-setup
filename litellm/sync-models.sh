@@ -1,19 +1,18 @@
 #!/bin/sh
 # Entrypoint for the litellm container (see docker-compose.yaml).
 #
-# Each start:
-#   1. Find models on every llama.cpp server in the providers ini and
-#      write a model-free config from the template.
-#   2. Start LiteLLM and wait for its API.
-#   3. Register the found models that the API does not know yet.
-#   4. Wait on LiteLLM, forwarding TERM and INT to it.
+# On start:
+#   1. Find models on every llama.cpp server and write the gateway config.
+#   2. Start LiteLLM and register the found models it does not know yet.
+#   3. Repeat the find and register steps every SYNC_INTERVAL seconds.
+#   4. Forward TERM and INT to LiteLLM and to the sync loop.
 #
 # Models are added through the API, not the config file, because
-# config-file models cannot be edited in the UI. The add is one-way, so
-# UI edits are never overwritten.
+# config-file models cannot be edited in the UI. Sync only adds: a model
+# already in the database is never changed, so UI edits are kept.
 #
 # A malformed ini stops the start. Any other failure only logs, and the
-# gateway runs with whatever is already in its database.
+# gateway keeps running with whatever is already in its database.
 #
 # The Python helpers live in ./sync/. Env overrides (also for dry runs):
 #   PROVIDERS_INI          default /app/provider/llamacpp.ini
@@ -25,6 +24,7 @@
 #   GATEWAY_BIN            default litellm
 #   GATEWAY_WAIT_TIMEOUT   seconds to wait for the API, default 180
 #   SYNC_WAIT_TIMEOUT      seconds to wait per llama.cpp server, default 120
+#   SYNC_INTERVAL          seconds between re-syncs, default 300, 0 = off
 #   SYNC_DRY_RUN=1         find models, print them, exit without starting
 #   LITELLM_MASTER_KEY     API auth (already set in the container)
 set -eu
@@ -36,20 +36,31 @@ DISCOVERED_JSON="${DISCOVERED_JSON:-/tmp/sync-models-discovered.json}"
 SYNC_DIR="${SYNC_DIR:-/app/sync}"
 GATEWAY_BIN="${GATEWAY_BIN:-litellm}"
 SYNC_WAIT_TIMEOUT="${SYNC_WAIT_TIMEOUT:-120}"
+SYNC_INTERVAL="${SYNC_INTERVAL:-300}"
+
+sync_pid=""
 
 log() {
     echo "sync-models: $*" >&2
 }
 
-discover_models() {
+find_models() {
+    python3 "$SYNC_DIR/discover.py" "$PROVIDERS_INI" "$DISCOVERED_JSON" "$SYNC_WAIT_TIMEOUT"
+}
+
+prepare_config() {
     if [ ! -f "$PROVIDERS_INI" ]; then
-        log "WARNING: $PROVIDERS_INI not found, starting with template config"
-        cp "$TEMPLATE_YAML" "$CONFIG_OUT"
+        log "WARNING: $PROVIDERS_INI not found, starting with no models"
         printf '[]' >"$DISCOVERED_JSON"
-        return 0
+    else
+        find_models
     fi
-    python3 "$SYNC_DIR/discover.py" "$PROVIDERS_INI" "$TEMPLATE_YAML" \
-        "$CONFIG_OUT" "$DISCOVERED_JSON" "$SYNC_WAIT_TIMEOUT"
+    python3 "$SYNC_DIR/write_config.py" "$TEMPLATE_YAML" "$CONFIG_OUT"
+}
+
+register_models() {
+    python3 "$SYNC_DIR/register.py" "$DISCOVERED_JSON" \
+        || log "WARNING: model registration crashed, gateway keeps running"
 }
 
 show_dry_run() {
@@ -61,16 +72,32 @@ show_dry_run() {
 start_gateway() {
     "$GATEWAY_BIN" "$@" &
     gw_pid=$!
-    trap 'kill -TERM "$gw_pid" 2>/dev/null || true' TERM INT
 }
 
-register_models() {
-    python3 "$SYNC_DIR/register.py" "$DISCOVERED_JSON" \
-        || log "WARNING: model registration crashed, gateway keeps running"
+sync_forever() {
+    while sleep "$SYNC_INTERVAL"; do
+        find_models || log "WARNING: model discovery failed, retrying in ${SYNC_INTERVAL}s"
+        register_models
+    done
+}
+
+start_sync() {
+    if [ "$SYNC_INTERVAL" -eq 0 ]; then
+        return 0
+    fi
+    sync_forever &
+    sync_pid=$!
+}
+
+on_term() {
+    kill -TERM "$gw_pid" 2>/dev/null || true
+    if [ -n "$sync_pid" ]; then
+        kill -TERM "$sync_pid" 2>/dev/null || true
+    fi
 }
 
 main() {
-    discover_models
+    prepare_config
 
     if [ "${SYNC_DRY_RUN:-0}" = "1" ]; then
         show_dry_run
@@ -78,8 +105,16 @@ main() {
     fi
 
     start_gateway "$@"
+    trap on_term TERM INT
     register_models
-    wait "$gw_pid"
+    start_sync
+
+    status=0
+    wait "$gw_pid" || status=$?
+    if [ -n "$sync_pid" ]; then
+        kill "$sync_pid" 2>/dev/null || true
+    fi
+    exit "$status"
 }
 
 main "$@"
