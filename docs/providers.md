@@ -25,7 +25,8 @@ The example file lists more optional overrides, such as `max_input_tokens`, `sup
 
 ## When models are added
 
-- The gateway checks every server when it starts.
+- The gateway starts right away. It does not wait for the llama.cpp servers.
+- It checks every server in the background when it starts.
 - It checks again every 5 minutes, so new servers and new models appear without a restart.
 - It adds only models it does not know yet.
 - Models you edit in the Admin UI are never overwritten.
