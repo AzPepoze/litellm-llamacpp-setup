@@ -24,7 +24,7 @@ def fetch_models(base_url, api_key, timeout):
                 error(f"{url} unreachable after {timeout:.0f}s ({e}); skipping server")
                 return []
             info(f"{url} not ready (attempt {attempt}: {e}), retrying...")
-            time.sleep(RETRY_DELAY)
+            time.sleep(max(0, min(RETRY_DELAY, deadline - time.time())))
 
 
 def read_models(request):
