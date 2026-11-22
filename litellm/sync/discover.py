@@ -5,6 +5,8 @@ Usage: discover.py PROVIDERS_INI TEMPLATE_YAML CONFIG_OUT DISCOVERED_JSON TIMEOU
 import configparser
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
 
 from ini import read_provider
 from llamacpp import fetch_models
@@ -12,13 +14,25 @@ from log import fail, info, warn
 from model_info import build_entry
 
 
+def fetch_provider_models(provider, timeout):
+    models = fetch_models(provider.base_url, provider.api_key, timeout)
+    info(f"[{provider.section}] discovered {len(models)} model(s)")
+    return models
+
+
+def fetch_all_models(providers, timeout):
+    """Query all servers at once, so a slow or dead server never delays the others."""
+    with ThreadPoolExecutor(max_workers=max(1, len(providers))) as pool:
+        return list(pool.map(fetch_provider_models, providers, repeat(timeout)))
+
+
 def discover_entries(cp, timeout):
+    providers = [read_provider(cp, section) for section in cp.sections()]
+    model_lists = fetch_all_models(providers, timeout)
+
     entries = []
     seen = set()
-    for section in cp.sections():
-        provider = read_provider(cp, section)
-        models = fetch_models(provider.base_url, provider.api_key, timeout)
-        info(f"[{section}] discovered {len(models)} model(s)")
+    for provider, models in zip(providers, model_lists):
         for model in models:
             if not isinstance(model, dict):
                 continue
