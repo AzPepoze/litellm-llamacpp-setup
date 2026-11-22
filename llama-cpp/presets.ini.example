@@ -32,6 +32,15 @@ flash-attn = on
 ; ctx-size = 8192
 ; load-on-startup = true
 
+# --- Example model from a specific file in the repo ---
+# Use hf-file when the repo has many quants and you want one file.
+; [Inkling-2-Mini-UD-IQ3_XXS]
+; hf-repo = unsloth/Inkling-2-Mini-GGUF
+; hf-file = Mainline_Support/Inkling-2-Mini-UD-IQ3_XXS.gguf_file
+; ctx-size = 8192
+; parallel = 1
+; load-on-startup = true
+
 # --- Example embedding model ---
 ; [my-embed-model]
 ; hf-repo = ggml-org/bge-m3-GGUF:Q8_0
