@@ -1,0 +1,31 @@
+services:
+  basalt:
+    build:
+      context: https://github.com/jesdga95/basalt.git
+    image: basalt:local
+    container_name: basalt
+    restart: unless-stopped
+    ulimits:
+      memlock: -1
+    shm_size: 2g
+    stop_grace_period: 120s
+    volumes:
+      - ./data:/data
+      - ./models:/models
+    secrets:
+      - api_key
+    command: ["--api-key-file", "/run/secrets/api_key"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8081:8080"
+    networks:
+      - default
+secrets:
+  api_key:
+    file: ./api_key

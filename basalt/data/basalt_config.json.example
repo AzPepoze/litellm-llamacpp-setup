@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "models": [
+    {
+      "alias": "qwen3.8-27b",
+      "model": "/models/Qwen3.8-27B-QUASAR-NVFP4.basalt",
+      "kv": "int8",
+      "max-context": 32768
+    }
+  ],
+  "engine": {
+    "resident-experts": true
+  },
+  "server": {
+    "port": 8080
+  }
+}
