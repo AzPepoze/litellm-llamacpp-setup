@@ -6,11 +6,13 @@
       "model": "/models/Qwen3.8-27B-QUASAR-NVFP4.basalt",
       "kv": "int8",
       "max-context": 32768
+    },
+    {
+      "alias": "inkling-2-mini",
+      "model": "/models/Inkling-2-Mini-NVFP4-MX8.basalt",
+      "max-context": 32768
     }
   ],
-  "engine": {
-    "resident-experts": true
-  },
   "server": {
     "port": 8080
   }
