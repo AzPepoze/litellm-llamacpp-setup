@@ -17,7 +17,7 @@
 # in its database.
 #
 # The Python helpers live in ./sync/. Env overrides (also for dry runs):
-#   PROVIDERS_INI          default /app/provider/llamacpp.ini
+#   PROVIDERS_INI          default /app/provider/providers.ini
 #   TEMPLATE_YAML          default /app/config.template.yaml
 #   CONFIG_OUT             default /app/config.yaml
 #   DISCOVERED_JSON        default /tmp/sync-models-discovered.json
@@ -31,7 +31,7 @@
 #   LITELLM_MASTER_KEY     API auth (already set in the container)
 set -eu
 
-PROVIDERS_INI="${PROVIDERS_INI:-/app/provider/llamacpp.ini}"
+PROVIDERS_INI="${PROVIDERS_INI:-/app/provider/providers.ini}"
 TEMPLATE_YAML="${TEMPLATE_YAML:-/app/config.template.yaml}"
 CONFIG_OUT="${CONFIG_OUT:-/app/config.yaml}"
 DISCOVERED_JSON="${DISCOVERED_JSON:-/tmp/sync-models-discovered.json}"

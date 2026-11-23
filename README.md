@@ -1,4 +1,4 @@
-# litellm-llamacpp-setup
+# litellm-inference-setup
 
 Run models on your NVIDIA GPU and call them all through one OpenAI-compatible API.
 
@@ -27,7 +27,7 @@ flowchart LR
    cp litellm/.env.example litellm/.env
    cp llama-cpp/.env.example llama-cpp/.env
    cp llama-cpp/presets.ini.example llama-cpp/presets.ini
-   cp litellm/provider/llamacpp.ini.example litellm/provider/llamacpp.ini
+   cp litellm/provider/providers.ini.example litellm/provider/providers.ini
    ```
 
 2. Set your secrets.
@@ -39,7 +39,7 @@ flowchart LR
 
 3. Add a model to `llama-cpp/presets.ini`. Uncomment one example block and set its `hf-repo`. See [Models](docs/models.md).
 
-4. Point the gateway at your llama.cpp server in `litellm/provider/llamacpp.ini`. See [Providers](docs/providers.md).
+4. Point the gateway at your llama.cpp server in `litellm/provider/providers.ini`. See [Providers](docs/providers.md).
 
    > [!IMPORTANT]
    > Use the server's LAN hostname or IP, not `localhost`. The gateway runs in Docker, so `localhost` means the gateway container itself.
@@ -82,7 +82,7 @@ These files hold your secrets and settings. Git ignores them.
 | `litellm/.env` | Database and admin passwords |
 | `llama-cpp/.env` | llama.cpp API key |
 | `llama-cpp/presets.ini` | Your model list and settings |
-| `litellm/provider/llamacpp.ini` | Your server addresses and keys |
+| `litellm/provider/providers.ini` | Your server addresses and keys |
 | `llama-cpp/models/` | Downloaded model weights |
 | `litellm/config.yaml` | Generated at every gateway start |
 

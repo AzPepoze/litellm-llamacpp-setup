@@ -1,4 +1,4 @@
-"""Find the models on every llama.cpp server and save them as JSON.
+"""Find the models on every inference server and save them as JSON.
 
 Usage: discover.py PROVIDERS_INI DISCOVERED_JSON TIMEOUT
 """

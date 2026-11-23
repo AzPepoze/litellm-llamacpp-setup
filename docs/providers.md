@@ -2,7 +2,7 @@
 
 Back to [README](../README.md)
 
-A provider is one [llama.cpp](https://github.com/ggml-org/llama.cpp) server. The [LiteLLM](https://docs.litellm.ai) gateway reads `litellm/provider/llamacpp.ini` and adds the models of each server.
+A provider is one inference server, such as [llama.cpp](https://github.com/ggml-org/llama.cpp) or [Basalt](basalt.md). The [LiteLLM](https://docs.litellm.ai) gateway reads `litellm/provider/providers.ini` and adds the models of each server.
 
 ## Configure a server
 
