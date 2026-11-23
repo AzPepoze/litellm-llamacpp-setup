@@ -1,0 +1,16 @@
+# Copied to setup.conf by ./setup.sh. Edit it, then run ./setup.sh again to apply.
+
+# models, gateway or both (set by the setup menu)
+ROLE=
+
+# Model servers on this machine (true or false)
+ENABLE_LLAMA_CPP=true
+ENABLE_BASALT=false
+
+# Address the model servers and LiteLLM listen on
+LISTEN_ADDRESS=0.0.0.0
+
+# Host ports
+LLAMA_CPP_PORT=8080
+BASALT_PORT=8081
+LITELLM_PORT=4000

@@ -20,6 +20,9 @@ litellm/provider/*.ini
 # LiteLLM runtime config (generated in-container at startup from config.template.yaml)
 litellm/config.yaml
 
+# Local setup choices (written by setup.sh from setup.conf.example)
+setup.conf
+
 # Operating System Files
 .DS_Store
 Thumbs.db
