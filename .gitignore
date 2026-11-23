@@ -10,8 +10,8 @@ models/**/*
 !.env.example
 
 # llama.cpp presets (real config ignored, template tracked)
-llama-cpp/presets.ini
-!llama-cpp/presets.ini.example
+inference/llama-cpp/presets.ini
+!inference/llama-cpp/presets.ini.example
 
 # llama.cpp provider endpoints (real list ignored, template tracked)
 litellm/provider/*.ini

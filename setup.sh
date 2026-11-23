@@ -120,14 +120,14 @@ create_api_key() {
 
 write_llama_section() {
   local key
-  key="$(read_env_value llama-cpp/.env LLAMA_CPP_API_KEY)"
-  [[ -n "$key" ]] || fail_exit "LLAMA_CPP_API_KEY is empty in llama-cpp/.env"
+  key="$(read_env_value inference/llama-cpp/.env LLAMA_CPP_API_KEY)"
+  [[ -n "$key" ]] || fail_exit "LLAMA_CPP_API_KEY is empty in inference/llama-cpp/.env"
   printf '[llama-cpp]\nbase_url = http://%s:8080/v1\napi_key = %s\n\n' "$HOST_ADDRESS" "$key"
 }
 
 write_basalt_section() {
   local key
-  key="$(head -n 1 basalt/api_key)"
+  key="$(head -n 1 inference/basalt/api_key)"
   printf '[basalt]\nbase_url = http://%s:8081/v1\napi_key = %s\n' "$HOST_ADDRESS" "$key"
 }
 
@@ -153,13 +153,13 @@ setup_gateway() {
 }
 
 setup_llama_cpp() {
-  create_secret_env llama-cpp/.env.example llama-cpp/.env LLAMA_CPP_API_KEY
-  copy_if_missing llama-cpp/presets.ini.example llama-cpp/presets.ini
+  create_secret_env inference/llama-cpp/.env.example inference/llama-cpp/.env LLAMA_CPP_API_KEY
+  copy_if_missing inference/llama-cpp/presets.ini.example inference/llama-cpp/presets.ini
 }
 
 setup_basalt() {
-  copy_if_missing basalt/data/basalt_config.json.example basalt/data/basalt_config.json
-  create_api_key basalt/api_key
+  copy_if_missing inference/basalt/data/basalt_config.json.example inference/basalt/data/basalt_config.json
+  create_api_key inference/basalt/api_key
 }
 
 check_docker() {
@@ -173,10 +173,16 @@ check_openssl() {
   ok "openssl found"
 }
 
-check_nvidia_runtime() {
+has_nvidia_gpu_support() {
   local info
   info="$(docker info 2>/dev/null || true)"
-  if grep -qi nvidia <<< "$info"; then
+  if grep -qi nvidia <<< "$info"; then return 0; fi
+  if command -v nvidia-ctk >/dev/null 2>&1; then return 0; fi
+  [[ -f /var/run/cdi/nvidia.yaml ]]
+}
+
+check_nvidia_runtime() {
+  if has_nvidia_gpu_support; then
     ok "NVIDIA container runtime found"
   else
     warn "NVIDIA container runtime not found. Install the NVIDIA Container Toolkit: $NVIDIA_TOOLKIT_URL"
@@ -184,20 +190,20 @@ check_nvidia_runtime() {
 }
 
 check_llama_presets() {
-  if grep -Eq '^[[:space:]]*\[[^]*]+\]' llama-cpp/presets.ini; then
-    ok "Model section found in llama-cpp/presets.ini"
+  if grep -Eq '^[[:space:]]*\[[^]*]+\]' inference/llama-cpp/presets.ini; then
+    ok "Model section found in inference/llama-cpp/presets.ini"
   else
-    warn "No model in llama-cpp/presets.ini. Uncomment one example block. See docs/models.md"
+    warn "No model in inference/llama-cpp/presets.ini. Uncomment one example block. See docs/models.md"
   fi
 }
 
 check_basalt_models() {
-  if compgen -G "basalt/models/*.basalt" >/dev/null; then
-    ok "Basalt model found in basalt/models/"
+  if compgen -G "inference/basalt/models/*.basalt" >/dev/null; then
+    ok "Basalt model found in inference/basalt/models/"
     return 0
   fi
-  warn "No .basalt model in basalt/models/. Download one:"
-  printf '      cd basalt\n'
+  warn "No .basalt model in inference/basalt/models/. Download one:"
+  printf '      cd inference/basalt\n'
   printf '      hf download jesdga/Qwen3.8-27B-Basalt Qwen3.8-27B-QUASAR-NVFP4.basalt --local-dir models\n'
 }
 
@@ -214,15 +220,15 @@ run_compose() {
 }
 
 start_services() {
-  if llama_enabled; then run_compose llama-cpp/docker-compose.yaml up -d; fi
-  if basalt_enabled; then run_compose basalt/docker-compose.yaml up -d --build; fi
+  if llama_enabled; then run_compose inference/llama-cpp/docker-compose.yaml up -d; fi
+  if basalt_enabled; then run_compose inference/basalt/docker-compose.yaml up -d --build; fi
   run_compose litellm/docker-compose.yaml up -d
 }
 
 print_start_commands() {
   printf 'Start later with:\n'
-  if llama_enabled; then printf '  docker compose -f llama-cpp/docker-compose.yaml up -d\n'; fi
-  if basalt_enabled; then printf '  docker compose -f basalt/docker-compose.yaml up -d --build\n'; fi
+  if llama_enabled; then printf '  docker compose -f inference/llama-cpp/docker-compose.yaml up -d\n'; fi
+  if basalt_enabled; then printf '  docker compose -f inference/basalt/docker-compose.yaml up -d --build\n'; fi
   printf '  docker compose -f litellm/docker-compose.yaml up -d\n'
 }
 

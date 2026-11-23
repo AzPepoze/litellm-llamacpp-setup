@@ -30,7 +30,7 @@ api_key = sk-change-me
 # tpm = 1000000
 # rpm = 1000
 
-# Basalt (basalt/docker-compose.yaml) listens on host port 8081.
+# Basalt (inference/basalt/docker-compose.yaml) listens on host port 8081.
 [basalt]
 base_url = http://example:8081/v1
 api_key = sk-change-me

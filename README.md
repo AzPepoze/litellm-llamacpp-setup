@@ -50,8 +50,8 @@ flowchart LR
 
 3. Add a model.
 
-   - **llama.cpp:** add a model to `llama-cpp/presets.ini`. See [Models](docs/models.md).
-   - **Basalt:** add a `.basalt` model file to `basalt/models` and set it in `basalt/data/basalt_config.json`. See [Basalt](docs/basalt.md).
+   - **llama.cpp:** add a model to `inference/llama-cpp/presets.ini`. See [Models](docs/models.md).
+   - **Basalt:** add a `.basalt` model file to `inference/basalt/models` and set it in `inference/basalt/data/basalt_config.json`. See [Basalt](docs/basalt.md).
 
    Then point the gateway at your servers in `litellm/provider/providers.ini`. See [Providers](docs/providers.md).
 
@@ -59,6 +59,8 @@ flowchart LR
    > Use the server's LAN hostname or IP, not `localhost`. The gateway runs in Docker, so `localhost` means the gateway container itself.
 
 4. Open `http://localhost:4000/ui/` and check that your models are listed.
+
+The model servers live in `inference/`: `inference/llama-cpp/` and `inference/basalt/`.
 
 ## Call the API
 
@@ -75,7 +77,7 @@ curl http://localhost:4000/v1/chat/completions \
 ## Update llama.cpp
 
 ```bash
-cd llama-cpp
+cd inference/llama-cpp
 ./update.sh                      # pulls the newest llama.cpp image
 docker compose up -d             # restarts with the new image
 ```
@@ -83,7 +85,7 @@ docker compose up -d             # restarts with the new image
 ## Update Basalt
 
 ```bash
-cd basalt
+cd inference/basalt
 ./update.sh                      # rebuilds the Basalt image with the newest code
 docker compose up -d             # restarts with the new image
 ```
@@ -95,14 +97,14 @@ These files hold your secrets and settings. Git ignores them.
 | Path | Holds |
 |---|---|
 | `litellm/.env` | Database and admin passwords |
-| `llama-cpp/.env` | llama.cpp API key |
-| `llama-cpp/presets.ini` | Your model list and settings |
+| `inference/llama-cpp/.env` | llama.cpp API key |
+| `inference/llama-cpp/presets.ini` | Your model list and settings |
 | `litellm/provider/providers.ini` | Your server addresses and keys |
-| `llama-cpp/models/` | Downloaded model weights |
+| `inference/llama-cpp/models/` | Downloaded model weights |
 | `litellm/config.yaml` | Generated at every gateway start |
-| `basalt/data/basalt_config.json` | Basalt settings |
-| `basalt/api_key` | Basalt API key |
-| `basalt/models/` | Basalt model files |
+| `inference/basalt/data/basalt_config.json` | Basalt settings |
+| `inference/basalt/api_key` | Basalt API key |
+| `inference/basalt/models/` | Basalt model files |
 
 ## More
 

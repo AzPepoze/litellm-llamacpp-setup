@@ -20,20 +20,20 @@ Project: [jesdga95/basalt](https://github.com/jesdga95/basalt)
 
 ## Setup
 
-1. Download a model into `basalt/models/`:
+1. Download a model into `inference/basalt/models/`:
 
    ```bash
    hf download jesdga/Qwen3.8-27B-Basalt Qwen3.8-27B-QUASAR-NVFP4.basalt --local-dir models
    ```
 
-2. Create the config. Copy `basalt/data/basalt_config.json.example` to `basalt/data/basalt_config.json` (`setup.sh` does this). Set the model name. Keep the server port at 8080.
+2. Create the config. Copy `inference/basalt/data/basalt_config.json.example` to `inference/basalt/data/basalt_config.json` (`setup.sh` does this). Set the model name. Keep the server port at 8080.
 
-3. Set the API key. It is stored in `basalt/api_key` (`setup.sh` creates it). The server reads this file. The key is not in the config.
+3. Set the API key. It is stored in `inference/basalt/api_key` (`setup.sh` creates it). The server reads this file. The key is not in the config.
 
 4. Build and start:
 
    ```bash
-   docker compose -f basalt/docker-compose.yaml up -d --build
+   docker compose -f inference/basalt/docker-compose.yaml up -d --build
    ```
 
    > [!NOTE]
@@ -55,10 +55,40 @@ Project: [jesdga95/basalt](https://github.com/jesdga95/basalt)
 | `max-context` | Longest context in tokens. Default: 8192. The KV cache grows with it |
 | `server.port` | Port inside the container. Keep `8080`. To change the host port, edit `docker-compose.yaml` |
 
+## Several models
+
+Basalt can list more than one model. Only one model is loaded at a time.
+
+- A request's `model` picks the model, by its `alias`.
+- A request for another model ends the loaded model and starts the new one.
+- Clients wait during a swap.
+- The first entry loads at start.
+
+```json
+{
+  "models": [
+    {
+      "alias": "qwen3.8-27b",
+      "model": "/models/Qwen3.8-27B-QUASAR-NVFP4.basalt",
+      "kv": "int8",
+      "max-context": 32768
+    },
+    {
+      "alias": "inkling-2-mini",
+      "model": "/models/Inkling-2-Mini-NVFP4-MX8.basalt",
+      "max-context": 32768
+    }
+  ],
+  "server": {
+    "port": 8080
+  }
+}
+```
+
 ## Update
 
 ```bash
-cd basalt
+cd inference/basalt
 ./update.sh
 docker compose up -d
 ```

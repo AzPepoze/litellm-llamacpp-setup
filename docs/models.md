@@ -2,12 +2,12 @@
 
 Back to [README](../README.md)
 
-Models are declared in `llama-cpp/presets.ini`. Each `[section]` is one model.
+Models are declared in `inference/llama-cpp/presets.ini`. Each `[section]` is one model.
 
 ## Add a model
 
 1. Find a [GGUF](https://huggingface.co/docs/hub/gguf) model on [Hugging Face](https://huggingface.co/models?library=gguf).
-2. Copy one example block from `llama-cpp/presets.ini.example` into `llama-cpp/presets.ini` and remove the leading `;`.
+2. Copy one example block from `inference/llama-cpp/presets.ini.example` into `inference/llama-cpp/presets.ini` and remove the leading `;`.
 3. Set `hf-repo` to `user/repo:quant`.
 
 ```ini
@@ -45,4 +45,4 @@ The example file has blocks for:
 
 > [!TIP]
 > Restart the llama.cpp container after you change `presets.ini`:
-> `docker compose -f llama-cpp/docker-compose.yaml restart`
+> `docker compose -f inference/llama-cpp/docker-compose.yaml restart`
