@@ -3,5 +3,5 @@ models/
 # API key (created by setup.sh)
 api_key
 # Your Basalt config and its cache
-data/basalt_config.json
-data/.cache/
+basalt_config.json
+cache/

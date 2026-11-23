@@ -51,7 +51,7 @@ flowchart LR
 3. Add a model.
 
    - **llama.cpp:** add a model to `inference/llama-cpp/presets.ini`. See [Models](docs/models.md).
-   - **Basalt:** add a `.basalt` model file to `inference/basalt/models` and set it in `inference/basalt/data/basalt_config.json`. See [Basalt](docs/basalt.md).
+   - **Basalt:** add a `.basalt` model file to `inference/basalt/models` and set it in `inference/basalt/basalt_config.json`. See [Basalt](docs/basalt.md).
 
    Then point the gateway at your servers in `litellm/provider/providers.ini`. See [Providers](docs/providers.md).
 
@@ -86,7 +86,7 @@ docker compose up -d             # restarts with the new image
 
 ```bash
 cd inference/basalt
-./update.sh                      # rebuilds the Basalt image with the newest code
+./update.sh                      # rebuilds the Basalt image from the pinned release
 docker compose up -d             # restarts with the new image
 ```
 
@@ -102,7 +102,7 @@ These files hold your secrets and settings. Git ignores them.
 | `litellm/provider/providers.ini` | Your server addresses and keys |
 | `inference/llama-cpp/models/` | Downloaded model weights |
 | `litellm/config.yaml` | Generated at every gateway start |
-| `inference/basalt/data/basalt_config.json` | Basalt settings |
+| `inference/basalt/basalt_config.json` | Basalt settings |
 | `inference/basalt/api_key` | Basalt API key |
 | `inference/basalt/models/` | Basalt model files |
 

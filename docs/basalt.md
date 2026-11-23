@@ -7,6 +7,8 @@ Project: [jesdga95/basalt](https://github.com/jesdga95/basalt)
 
 ## Requirements
 
+Basalt is installed from the latest release (v0.5.6) of its project. The image downloads that release. Nothing is compiled.
+
 | Item | Need |
 |---|---|
 | GPU | RTX 50 series (Blackwell) |
@@ -26,7 +28,7 @@ Project: [jesdga95/basalt](https://github.com/jesdga95/basalt)
    hf download jesdga/Qwen3.8-27B-Basalt Qwen3.8-27B-QUASAR-NVFP4.basalt --local-dir models
    ```
 
-2. Create the config. Copy `inference/basalt/data/basalt_config.json.example` to `inference/basalt/data/basalt_config.json` (`setup.sh` does this). Set the model name. Keep the server port at 8080.
+2. Create the config. Copy `inference/basalt/basalt_config.json.example` to `inference/basalt/basalt_config.json` (`setup.sh` does this). Set the model name. Keep the server port at 8080.
 
 3. Set the API key. It is stored in `inference/basalt/api_key` (`setup.sh` creates it). The server reads this file. The key is not in the config.
 
@@ -36,8 +38,7 @@ Project: [jesdga95/basalt](https://github.com/jesdga95/basalt)
    docker compose -f inference/basalt/docker-compose.yaml up -d --build
    ```
 
-   > [!NOTE]
-   > The first build takes a long time because it compiles the engine.
+   The first build downloads the release and installs its Python packages.
 
 5. Check the server. Replace `<key>` with your API key:
 
@@ -84,6 +85,12 @@ Basalt can list more than one model. Only one model is loaded at a time.
   }
 }
 ```
+
+## Version
+
+The version is set by `BASALT_VERSION` in `inference/basalt/Dockerfile`.
+To move to a newer release, change that value, then run `update.sh`.
+After that, run `docker compose up -d` to start the new image.
 
 ## Update
 

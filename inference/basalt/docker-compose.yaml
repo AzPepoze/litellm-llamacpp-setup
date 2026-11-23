@@ -1,7 +1,7 @@
 services:
   basalt:
     build:
-      context: https://github.com/jesdga95/basalt.git
+      context: .
     image: basalt:local
     container_name: basalt
     restart: unless-stopped
@@ -10,7 +10,8 @@ services:
     shm_size: 2g
     stop_grace_period: 120s
     volumes:
-      - ./data:/data
+      - ./basalt_config.json:/data/basalt_config.json:ro
+      - ./cache:/data/.cache
       - ./models:/models
     secrets:
       - api_key

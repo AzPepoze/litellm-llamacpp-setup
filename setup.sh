@@ -158,7 +158,7 @@ setup_llama_cpp() {
 }
 
 setup_basalt() {
-  copy_if_missing inference/basalt/data/basalt_config.json.example inference/basalt/data/basalt_config.json
+  copy_if_missing inference/basalt/basalt_config.json.example inference/basalt/basalt_config.json
   create_api_key inference/basalt/api_key
 }
 

@@ -58,7 +58,7 @@ Basalt is an optional second model server. It needs an NVIDIA RTX 50 series GPU.
 1. Copy the config and create the API key.
 
    ```bash
-   cp inference/basalt/data/basalt_config.json.example inference/basalt/data/basalt_config.json
+   cp inference/basalt/basalt_config.json.example inference/basalt/basalt_config.json
    openssl rand -hex 24 > inference/basalt/api_key
    chmod 600 inference/basalt/api_key
    ```
