@@ -17,7 +17,7 @@ api_key = sk-your-key-here
 
 | Key | Required | What it does |
 |---|---|---|
-| `base_url` | Yes | Server address, as seen from the gateway container |
+| `base_url` | Yes | The machine's name or IP and the port, as seen from the gateway machine. Not `localhost` |
 | `api_key` | Yes | Must match that server's `LLAMA_CPP_API_KEY` |
 | `model_prefix` | No | Text added before each model name. Use it with 2 or more servers to avoid name clashes |
 

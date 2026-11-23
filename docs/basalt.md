@@ -54,7 +54,9 @@ Basalt is installed from the latest release (v0.5.6) of its project. The image d
 | `alias` | Name the API reports for the model |
 | `kv` | Storage type for the KV cache. For the 27B model: `fp16` or `int8`. `int8` uses about half the memory |
 | `max-context` | Longest context in tokens. Default: 8192. The KV cache grows with it |
-| `server.port` | Port inside the container. Keep `8080`. To change the host port, edit `docker-compose.yaml` |
+| `server.port` | Port inside the container. Keep `8080` |
+
+To change the host port, set `BASALT_PORT` in `inference/basalt/.env`. `setup.sh` writes it from `setup.conf`. Do not edit `docker-compose.yaml`.
 
 ## Several models
 

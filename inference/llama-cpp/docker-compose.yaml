@@ -18,7 +18,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "8080:8080"
+      - "${LISTEN_ADDRESS:-0.0.0.0}:${LLAMA_CPP_PORT:-8080}:8080"
     entrypoint: /app/llama-server
     command: >
       --models-preset /app/presets.ini

@@ -22,7 +22,7 @@ services:
     container_name: litellm
     restart: unless-stopped
     ports:
-      - "${LITELLM_PORT:-4000}:4000"
+      - "${LISTEN_ADDRESS:-0.0.0.0}:${LITELLM_PORT:-4000}:4000"
     depends_on:
       postgres:
         condition: service_healthy

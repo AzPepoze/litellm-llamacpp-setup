@@ -13,6 +13,8 @@ services:
       - ./basalt_config.json:/data/basalt_config.json:ro
       - ./cache:/data/.cache
       - ./models:/models
+    env_file:
+      - .env
     secrets:
       - api_key
     command: ["--api-key-file", "/run/secrets/api_key"]
@@ -24,7 +26,7 @@ services:
               count: all
               capabilities: [gpu]
     ports:
-      - "8081:8080"
+      - "${LISTEN_ADDRESS:-0.0.0.0}:${BASALT_PORT:-8081}:8080"
     networks:
       - default
 secrets:

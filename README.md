@@ -8,18 +8,20 @@ Run models on your NVIDIA GPU with llama.cpp, and optionally Basalt, then call t
 
 ```mermaid
 flowchart LR
-    App[Your app] --> LiteLLM[LiteLLM gateway<br/>localhost:4000]
-    LiteLLM --> LlamaCpp[llama.cpp<br/>localhost:8080]
-    LiteLLM --> Basalt[Basalt<br/>localhost:8081, optional]
+    App[Your app] --> LiteLLM[LiteLLM gateway<br/>port 4000]
+    LiteLLM --> LlamaCpp[llama.cpp<br/>GPU machine, port 8080]
+    LiteLLM --> Basalt[Basalt<br/>GPU machine, port 8081, optional]
     LlamaCpp --> GPU[NVIDIA GPU]
     Basalt --> GPU
 ```
 
 | Service | Address | Role |
 |---|---|---|
-| [llama.cpp](https://github.com/ggml-org/llama.cpp) | `http://localhost:8080` | Runs the models on the GPU |
-| [Basalt](https://github.com/jesdga95/basalt) | `http://localhost:8081` | Runs `.basalt` models on RTX 50 series GPUs, optional |
-| [LiteLLM](https://docs.litellm.ai) | `http://localhost:4000` | Gateway and API. Admin UI at `/ui` |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | `http://<host>:8080` | Runs the models on the GPU |
+| [Basalt](https://github.com/jesdga95/basalt) | `http://<host>:8081` | Runs `.basalt` models on RTX 50 series GPUs, optional |
+| [LiteLLM](https://docs.litellm.ai) | `http://<host>:4000` | Gateway and API. Admin UI at `/ui` |
+
+The ports come from `setup.conf`. The values above are the defaults. See [Setup and roles](docs/setup.md).
 
 ## Requirements
 
@@ -31,36 +33,40 @@ flowchart LR
 
 ## Quick start
 
-1. Clone the repo.
+The model servers run on the GPU machine. LiteLLM runs on the gateway machine. One machine can do both. See [Setup and roles](docs/setup.md).
+
+**1. On the GPU machine**
+
+1. Clone the repo and run the setup script.
 
    ```bash
    git clone https://github.com/AzPepoze/litellm-inference-setup.git
    cd litellm-inference-setup
-   ```
-
-2. Run the setup script.
-
-   ```bash
    ./setup.sh
    ```
 
-   It creates the config files, makes the secrets, asks which servers to enable, and can start them.
+2. Choose `1` (model servers).
+3. Add a model. See [Models](docs/models.md) for llama.cpp and [Basalt](docs/basalt.md) for Basalt.
 
-   Want to do it by hand? See [Manual setup](docs/manual-setup.md).
+**2. On the gateway machine**
 
-3. Add a model.
+1. Clone the repo and run the setup script.
 
-   - **llama.cpp:** add a model to `inference/llama-cpp/presets.ini`. See [Models](docs/models.md).
-   - **Basalt:** add a `.basalt` model file to `inference/basalt/models` and set it in `inference/basalt/basalt_config.json`. See [Basalt](docs/basalt.md).
+   ```bash
+   git clone https://github.com/AzPepoze/litellm-inference-setup.git
+   cd litellm-inference-setup
+   ./setup.sh
+   ```
 
-   Then point the gateway at your servers in `litellm/provider/providers.ini`. See [Providers](docs/providers.md).
+2. Choose `2` (gateway).
+3. Enter the model server address and keys. On the GPU machine, run `./setup.sh connect` to see them.
 
-   > [!IMPORTANT]
-   > Use the server's LAN hostname or IP, not `localhost`. The gateway runs in Docker, so `localhost` means the gateway container itself.
+> [!IMPORTANT]
+> Use the machine's name or IP for the model server address. Do not use `localhost`: LiteLLM runs in Docker.
 
-4. Open `http://localhost:4000/ui/` and check that your models are listed.
+**3. Open the admin UI**
 
-The model servers live in `inference/`: `inference/llama-cpp/` and `inference/basalt/`.
+Open `http://<gateway-machine>:4000/ui/` and check that your models are listed.
 
 ## Call the API
 
@@ -96,6 +102,7 @@ These files hold your secrets and settings. Git ignores them.
 
 | Path | Holds |
 |---|---|
+| `setup.conf` | Roles, enabled servers and ports |
 | `litellm/.env` | Database and admin passwords |
 | `inference/llama-cpp/.env` | llama.cpp API key |
 | `inference/llama-cpp/presets.ini` | Your model list and settings |
@@ -110,6 +117,7 @@ These files hold your secrets and settings. Git ignores them.
 
 | Topic | Page |
 |---|---|
+| Setup and roles | [docs/setup.md](docs/setup.md) |
 | Manual setup | [docs/manual-setup.md](docs/manual-setup.md) |
 | Models and presets | [docs/models.md](docs/models.md) |
 | Providers and sync | [docs/providers.md](docs/providers.md) |
