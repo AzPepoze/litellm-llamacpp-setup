@@ -5,14 +5,20 @@
       "alias": "qwen3.8-27b",
       "model": "/models/Qwen3.8-27B-QUASAR-NVFP4.basalt",
       "kv": "int8",
-      "max-context": 32768
+      "max-context": 131072,
+      "parallel": 3
     },
     {
       "alias": "inkling-2-mini",
       "model": "/models/Inkling-2-Mini-NVFP4-MX8.basalt",
-      "max-context": 32768
+      "kv": "fp8",
+      "max-context": 262144,
+      "parallel": 3
     }
   ],
+  "engine": {
+    "ram-reserve-mib": 1024
+  },
   "server": {
     "port": 8080
   }
